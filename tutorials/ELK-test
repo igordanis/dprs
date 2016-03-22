@@ -1,0 +1,6 @@
+5601 (Kibana web interface).
+9200 (Elasticsearch JSON interface).
+5044 (Logstash Beats interface, receives logs from Beats such as Filebeat – see the Forwarding logs with Filebeat section).
+5000 (Logstash Lumberjack interface, receives logs from Logstash forwarders – see the Forwarding logs with Logstash forwarder section).
+
+
