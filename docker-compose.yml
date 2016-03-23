@@ -1,40 +1,6 @@
 version: '2'
 services:
 
-    # zabbix-data:
-    #     image: busybox
-    #     volumes:
-    #         - /var/lib/mysql
-
-    # zabbix-db:
-    #     image: zabbix/zabbix-db-mariadb
-    #     volumes_from:
-    #         - zabbix-data
-    #     volumes:
-    #         - /backups:/backups
-    #         - /etc/localtime:/etc/localtime:ro
-    #     environment:
-    #         - MARIADB_USER=zabbix
-    #         - MARIADB_PASS=zabbix
-    #     depends_on:
-    #         - zabbix-data
-
-    # zabbix-webapp:
-    #     image: zabbix/zabbix-3.0:latest
-    #     volumes:
-    #         - /etc/localtime:/etc/localtime:ro
-    #     environment:
-    #         - ZS_DBHost=db
-    #         - ZS_DBUser=zabbix
-    #         - ZS_DBPassword=zabbix
-    #     links:
-    #         - zabbix-db
-    #     ports:
-    #         - 80:80
-    #         - 10051:10051
-    #     depends_on:
-    #         - zabbix-db
-
     zabbix-db-storage:
       image: busybox:latest
       volumes:
@@ -65,7 +31,6 @@ services:
         - ZS_DBUser=zabbix
         - ZS_DBPassword=my_password
 
-    
     web:
         build: .
 
@@ -73,3 +38,12 @@ services:
         build: .
         ports:
             - "8080:8080"
+
+    consul-main:
+        image: progrium/consul
+        ports:
+          - "8400:8400"
+          - "8500:8500"
+          - "8600:53/udp"
+        command: -server -bootstrap
+
