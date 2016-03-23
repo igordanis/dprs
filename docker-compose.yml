@@ -1,44 +1,12 @@
 version: '2'
 services:
 
-    # zabbix-data:
-    #     image: busybox
-    #     volumes:
-    #         - /var/lib/mysql
-
-    # zabbix-db:
-    #     image: zabbix/zabbix-db-mariadb
-    #     volumes_from:
-    #         - zabbix-data
-    #     volumes:
-    #         - /backups:/backups
-    #         - /etc/localtime:/etc/localtime:ro
-    #     environment:
-    #         - MARIADB_USER=zabbix
-    #         - MARIADB_PASS=zabbix
-    #     depends_on:
-    #         - zabbix-data
-
-    # zabbix-webapp:
-    #     image: zabbix/zabbix-3.0:latest
-    #     volumes:
-    #         - /etc/localtime:/etc/localtime:ro
-    #     environment:
-    #         - ZS_DBHost=db
-    #         - ZS_DBUser=zabbix
-    #         - ZS_DBPassword=zabbix
-    #     links:
-    #         - zabbix-db
-    #     ports:
-    #         - 80:80
-    #         - 10051:10051
-    #     depends_on:
-    #         - zabbix-db
-
     zabbix-db-storage:
       image: busybox:latest
       volumes:
         - /var/lib/mysql
+
+
 
     zabbix-db:
       image: zabbix/zabbix-db-mariadb
@@ -50,6 +18,8 @@ services:
       environment:
         - MARIADB_USER=zabbix
         - MARIADB_PASS=my_password
+
+
 
     zabbix-server:
       image: zabbix/zabbix-3.0:latest
@@ -65,11 +35,18 @@ services:
         - ZS_DBUser=zabbix
         - ZS_DBPassword=my_password
 
-    
+
+
     web:
         build: .
+        links:
+            - zabbix-server
+
+
 
     web0:
         build: .
         ports:
             - "8080:8080"
+        links:
+            - zabbix-server

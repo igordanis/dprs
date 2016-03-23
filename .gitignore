@@ -15,3 +15,8 @@ target
 
 *.idea
 *.iml
+
+.DS_Store
+
+read_logs_zabbix_client.sh
+read_logs_zabbix_server.sh
