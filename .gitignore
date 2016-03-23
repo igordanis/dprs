@@ -20,3 +20,4 @@ target
 
 read_logs_zabbix_client.sh
 read_logs_zabbix_server.sh
+backup_config_zabbix_server.sh

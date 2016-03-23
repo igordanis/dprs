@@ -39,6 +39,9 @@ services:
         ports:
             - "8080:8080"
 
+    haproxy:
+        build: ./docker/haproxy
+
     consul-main:
         image: progrium/consul
         ports:
