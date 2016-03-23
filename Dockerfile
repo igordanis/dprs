@@ -6,9 +6,10 @@ COPY ./docker/zabbix/zabbix_agentd.conf /etc/zabbix/zabbix_agentd.conf
 COPY ./docker/node_entrypoint.sh /node_entrypoint.sh
 
 RUN \
-	apk update && apk add zabbix-agent=2.4.7-r1 && \
-	rm -rf /var/cache/apk/* && \
-	mkdir -p /etc/zabbix/zabbix_agentd.d
+	apk update \
+	&& apk add zabbix-agent=2.4.7-r1 \
+	&& rm -rf /var/cache/apk/* \
+	&& mkdir -p /etc/zabbix/zabbix_agentd.d
 
 ADD ./target/dprs-0.0.1.jar app.jar
 
