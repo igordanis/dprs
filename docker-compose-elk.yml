@@ -1,0 +1,42 @@
+version: '2'
+services:
+
+  dynamo:
+    build:
+      ./docker/dynamo
+    ports:
+      - "8080:8080"
+    links:
+      - logstash
+#    depends_on:
+#      - logstash
+
+  elasticsearch:
+    image: elasticsearch:latest
+    command: elasticsearch -Des.network.host=0.0.0.0
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+
+  logstash:
+    image: logstash:latest
+    command: logstash -f /etc/logstash/conf.d/logstash.conf
+    volumes:
+      - ./docker/logstash/config:/etc/logstash/conf.d
+    ports:
+      - "5000:5000"
+    links:
+      - elasticsearch
+    environment:
+      - LS_HEAP_SIZE=256m
+#    depends_on:
+#     - elasticsearch
+
+  kibana:
+    build: ./docker/kibana/
+    volumes:
+      - ./docker/kibana/config/:/opt/kibana/config/
+    ports:
+      - "5601:5601"
+    links:
+      - elasticsearch

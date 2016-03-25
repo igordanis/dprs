@@ -31,11 +31,13 @@ services:
         - ZS_DBUser=zabbix
         - ZS_DBPassword=my_password
 
-    web:
-        build: .
+    dynamo:
+        build:
+          ./docker/dynamo
 
-    web0:
-        build: .
+    dynamo0:
+        build:
+          ./docker/dynamo
         ports:
             - "8080:8080"
 
