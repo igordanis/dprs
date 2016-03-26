@@ -31,61 +31,59 @@ services:
         - ZS_DBUser=zabbix
         - ZS_DBPassword=my_password
 
+    # Access ip addresses at http://localhost:8500/v1/catalog/service/web-test
+    # Required SERVICE_TAGS web for dynamic registration
     web:
         build: .
-
-    web0:
-        build: .
+        environment:
+          SERVICE_80_NAME: web-test
+          SERVICE_NAME: web-test
+          SERVICE_TAGS: web
         ports:
-            - "8080:8080"
+          - "8080"
 
-    haproxy:
-        build: ./docker/haproxy
-
-    consul-main:
-        image: progrium/consul:latest
-        hostname: "consul-main"
-        ports:
-          - "8400:8400"
-          - "8500:8500"
-          - "53:53"
-        command: "-server -data-dir /tmp/consul -bootstrap"
-
+    # Run only once
     consulserver:
         image: gliderlabs/consul-server:latest
         container_name: consulserver
+        hostname: consulserver
+        ports:
+           - "8300"
+           - "8301"
+           - "8400"
+           - "8500"
+           - "53"
+        command: -data-dir /tmp/consul -bootstrap -client 0.0.0.0 -node consulserver
+
+    # Run at every node
+    consulclient:
+        image: progrium/consul:latest
+        container_name: consulclient
+        links:
+           - "consulserver:consul"
         ports:
            - "8300"
            - "8400"
            - "8500:8500"
            - "53"
-        command: -data-dir /tmp/consul -bootstrap -client 0.0.0.0
+        command: -data-dir /tmp/consul -join consulserver
 
-    # Example of a service.. Access ip addresses at http://localhost:8500/v1/catalog/service/web-test
-    web-test:
-        image: yeasy/simple-web:latest
-        environment:
-          SERVICE_80_NAME: web-test
-          SERVICE_NAME: web-test
-          SERVICE_TAGS: web-test 
-        ports:
-        - "80"
-
+    # Run at every node
     registrator:
         image: gliderlabs/registrator:master
         container_name: registrator
-        network_mode: host
         links:
           - "consulserver:consul"
         volumes:
            - "/var/run/docker.sock:/tmp/docker.sock"
         command: -internal consul://consul:8500
 
-    consultemplate:
-        image: yeasy/nginx-consul-template:latest
-        container_name: consultemplate
-        hostname: consultemplate
+    # Run only once - access application through ip address of this docker-machine
+    proxy:
+        build: ./docker/proxy
+        container_name: 'load-balancer'
         links:
           - "consulserver:consul"
         ports:
-          - "80:80"
+          - "8080:8080"
+          - "8081"

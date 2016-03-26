@@ -1,0 +1,27 @@
+global
+    daemon
+
+defaults
+        mode http
+        timeout connect 5000
+        timeout client 50000
+        timeout server 50000
+
+listen stats
+        bind *:8081
+        stats enable
+        stats uri /
+
+frontend web-frontend
+        bind *:8080
+        default_backend web-backend
+
+backend web-backend
+{{ range services }}{{ if .Tags | contains "web" }}
+    {{ range service .Name }}
+        server {{ .ID }} {{ .Address }}:{{ .Port }}
+    {{ end }}
+{{ end }}{{ end }}
+
+
+ 
