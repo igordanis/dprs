@@ -31,13 +31,13 @@ services:
         - ZS_DBUser=zabbix
         - ZS_DBPassword=my_password
 
-    # Access ip addresses at http://localhost:8500/v1/catalog/service/web-test
+    # Access ip addresses at http://localhost:8500/v1/catalog/service/web-service
     # Required SERVICE_TAGS web for dynamic registration
-    web:
-        build: .
+    dynamo:
+        build: ./docker/dynamo
         environment:
-          SERVICE_80_NAME: web-test
-          SERVICE_NAME: web-test
+          SERVICE_80_NAME: web-service
+          SERVICE_NAME: web-service
           SERVICE_TAGS: web
         ports:
           - "8080"
@@ -78,7 +78,7 @@ services:
            - "/var/run/docker.sock:/tmp/docker.sock"
         command: -internal consul://consul:8500
 
-    # Run only once - access application through ip address of this docker-machine
+    # Run only once - access application through ip address of this docker-machine (ip:8080)
     proxy:
         build: ./docker/proxy
         container_name: 'load-balancer'
