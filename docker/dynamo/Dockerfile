@@ -15,6 +15,11 @@ RUN \
 
 ADD ./dprs-0.0.1.jar app.jar
 
+# Download consul
+ADD https://releases.hashicorp.com/consul/0.6.4/consul_0.6.4_linux_amd64.zip /tmp/consul.zip
+RUN cd /bin && unzip /tmp/consul.zip && chmod +x /bin/consul && rm /tmp/consul.zip
+RUN mkdir -p /etc/consul
+
 RUN sh -c 'touch /app.jar'
 
 #otvorenie portov:

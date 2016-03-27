@@ -36,11 +36,13 @@ services:
     dynamo:
         build: ./docker/dynamo
         environment:
-          SERVICE_80_NAME: web-service
-          SERVICE_NAME: web-service
-          SERVICE_TAGS: web
+          SERVICE_80_NAME: dynamo
+          SERVICE_NAME: dynamo
+          SERVICE_TAGS: dynamo
         ports:
           - "8080"
+        links:
+          - "consulserver:consul"
 
     # Run only once
     consulserver:
@@ -55,20 +57,7 @@ services:
            - "53"
         command: -data-dir /tmp/consul -bootstrap -client 0.0.0.0 -node consulserver
 
-    # Run at every node
-    consulclient:
-        image: progrium/consul:latest
-        container_name: consulclient
-        links:
-           - "consulserver:consul"
-        ports:
-           - "8300"
-           - "8400"
-           - "8500:8500"
-           - "53"
-        command: -data-dir /tmp/consul -join consulserver
-
-    # Run at every node
+    # Run at every docker-machine
     registrator:
         image: gliderlabs/registrator:master
         container_name: registrator
@@ -87,3 +76,16 @@ services:
         ports:
           - "8080:8080"
           - "8081"
+
+    # Run when developing app
+#    consulclient:
+#        image: progrium/consul:latest
+#        container_name: consulclient
+#        links:
+#           - "consulserver:consul"
+#        ports:
+#           - "8300"
+#           - "8400"
+#           - "8500:8500"
+#           - "53"
+#        command: -data-dir /tmp/consul -join consulserver

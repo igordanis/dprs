@@ -12,16 +12,15 @@ listen stats
         stats enable
         stats uri /
 
-frontend web-frontend
+frontend dynamo-frontend
         bind *:8080
-        default_backend web-backend
+        default_backend dynamo-backend
 
-backend web-backend
-{{ range services }}{{ if .Tags | contains "web" }}
-    {{ range service .Name }}
+backend dynamo-backend
+        balance roundrobin
+{{ range services }}{{ if .Tags | contains "dynamo" }}{{ range service .Name }}{{ if eq .Port 8080 }}
         server {{ .ID }} {{ .Address }}:{{ .Port }}
-    {{ end }}
-{{ end }}{{ end }}
+{{ end }}{{ end }}{{ end }}{{ end }}
 
 
  
