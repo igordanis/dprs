@@ -1,0 +1,66 @@
+1. Vytvoriť virtuálku pomocou
+docker-machine create -d=virtualbox consul-machine
+
+2. pripojiť sa k virtuálke pomocou 
+eval $(docker-machine env consul-machine)
+
+3. použiť svoj časť compose filu z gitu pre vytvorenie consul servera
+
+4. spustiť vykonanie compose filu
+docker-compose up -d
+
+5. overiť či beží consul
+docker ps
+
+malo by vrátiť informáciu, že beží jeho id,...
+
+6. vytvoriť swarm mastra
+docker-machine create -d virtualbox --swarm --swarm-master --swarm-discovery="consul://$(docker-machine ip consul-machine):8500" --engine-opt="cluster-store=consul://$(docker-machine ip consul-machine):8500" --engine-opt="cluster-advertise=eth1:2376" swarm-master
+
+7. pripojiť sa k swarm mastrovi
+eval "$(docker-machine env --swarm swarm-master)"
+
+8. vytvoriť niekoľko mašín napr.2 (stačí zmeniť len meno na konci)
+docker-machine create -d virtualbox --swarm --swarm-discovery="consul://$(docker-machine ip consul-machine):8500" --engine-opt="cluster-store=consul://$(docker-machine ip consul-machine):8500" --engine-opt="cluster-advertise=eth1:2376" swarm-node-01
+
+9. overiť, či bežia
+docker-machine ls
+
+10. pripojiť sa k mastrovi
+eval "$(docker-machine env --swarm swarm-master)"
+
+11. zobraziť obsah clustru
+docker info
+
+skontrolovať či je správny počet vytvorených kontajnerov a rolu
+
+12. zobraziť si aké adresy máme v consulovi mali by tam byť všetky virtuálky
+docker run swarm list consul://$(docker-machine ip consul-machine):8500
+
+
+13. pripojiť sa k swarmu ako swarm master
+eval "$(docker-machine env --swarm swarm-master)"
+
+14. zobraziť všetky siete
+docker network ls
+
+15. pomocou compose filu spustiť všetko čo chceme aby bežalo v našom clustri (zároveň mu povieme aby všetka sieť v clustri bola prepojená)
+docker-compose --x-networking up -d
+
+16. zobraziť zoznam sietí v ktorom by sa mala nachádza overlay sieť
+docker network ls
+
+17. skontrolovať či existuje overlay sieť aj u ostatných
+eval "$(docker-machine env swarm-node-01)"
+docker network ls
+
+eval "$(docker-machine env swarm-node-02)"
+docker network ls
+...
+
+18. skontrolovať či bežia všetky služby, ktoré chceme:
+docker ps
+
+19. pospúšťať všetky naše microservices
+
+
