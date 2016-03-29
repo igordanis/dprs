@@ -34,6 +34,7 @@ public class BasicController {
 
     @RequestMapping("/")
     public StatusResponse respond() {
+        logger.info("Requesting status from " + consulClient.getAgentSelf().getValue().getMember().getAddress());
         Map<String, String> serviceMap = new HashMap<>();
         for (CatalogService serviceInstance : consulClient.getCatalogService(applicationName, QueryParams.DEFAULT).getValue()) {
             serviceMap.put(serviceInstance.getAddress(), ping(serviceInstance.getAddress()));
