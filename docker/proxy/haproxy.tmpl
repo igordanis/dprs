@@ -17,10 +17,10 @@ frontend dynamo-frontend
         default_backend dynamo-backend
 
 backend dynamo-backend
-        balance roundrobin
-{{ range services }}{{ if .Tags | contains "dynamo" }}{{ range service .Name }}{{ if eq .Port 8080 }}
+        balance leastconn
+{{ range services }}{{ if .Tags | contains "dynamo" }}{{ range service .Name }}
         server {{ .ID }} {{ .Address }}:{{ .Port }}
-{{ end }}{{ end }}{{ end }}{{ end }}
+{{ end }}{{ end }}{{ end }}
 
 
  

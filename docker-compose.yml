@@ -56,17 +56,7 @@ services:
            - "8400"
            - "8500"
            - "53"
-        command: -data-dir /tmp/consul -bootstrap -client 0.0.0.0 -node consulserver
-
-    # Run at every docker-machine
-    registrator:
-        image: gliderlabs/registrator:master
-        container_name: registrator
-        links:
-          - "consulserver:consul"
-        volumes:
-           - "/var/run/docker.sock:/tmp/docker.sock"
-        command: -internal consul://consul:8500
+        command: -data-dir /tmp/consul -bootstrap -client 0.0.0.0 -node consulservers
 
     # Run only once - access application through ip address of this docker-machine (ip:8080)
     proxy:
@@ -77,19 +67,6 @@ services:
         ports:
           - "8080:8080"
           - "8081"
-
-    # Run when developing app
-#    consulclient:
-#        image: progrium/consul:latest
-#        container_name: consulclient
-#        links:
-#           - "consulserver:consul"
-#        ports:
-#           - "8300"
-#           - "8400"
-#           - "8500:8500"
-#           - "53"
-#        command: -data-dir /tmp/consul -join consulserver
 
     elasticsearch:
       image: elasticsearch:latest

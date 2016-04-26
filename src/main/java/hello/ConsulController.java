@@ -4,6 +4,7 @@ import com.ecwid.consul.v1.ConsulClient;
 import com.ecwid.consul.v1.QueryParams;
 import com.ecwid.consul.v1.agent.model.Member;
 import com.ecwid.consul.v1.catalog.model.CatalogService;
+import hello.struct.HealthResponse;
 import hello.struct.StatusResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,8 +24,8 @@ import java.util.Map;
 @EnableAutoConfiguration
 @EnableDiscoveryClient
 @RestController
-public class BasicController {
-    private static final Logger logger = LoggerFactory.getLogger(BasicController.class);
+public class ConsulController {
+    private static final Logger logger = LoggerFactory.getLogger(ConsulController.class);
 
     @Autowired
     ConsulClient consulClient;
@@ -32,8 +33,14 @@ public class BasicController {
     @Value("${spring.application.name}")
     String applicationName;
 
+    @RequestMapping("/health")
+    public HealthResponse getHealth() {
+        logger.info("Requesting health status from " + consulClient.getAgentSelf().getValue().getMember().getAddress());
+        return new HealthResponse();
+    }
+
     @RequestMapping("/")
-    public StatusResponse respond() {
+    public StatusResponse getStatus() {
         logger.info("Requesting status from " + consulClient.getAgentSelf().getValue().getMember().getAddress());
         Map<String, String> serviceMap = new HashMap<>();
         for (CatalogService serviceInstance : consulClient.getCatalogService(applicationName, QueryParams.DEFAULT).getValue()) {
@@ -47,8 +54,11 @@ public class BasicController {
             }
         }
 
+        String identifier = consulClient.getAgentSelf().getValue().getMember().getName() + " "
+                + consulClient.getAgentSelf().getValue().getMember().getAddress();
+
         return new StatusResponse(
-                consulClient.getAgentSelf().getValue().getMember().getAddress(),
+                identifier,
                 discoveryMap,
                 serviceMap
         );

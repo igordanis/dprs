@@ -8,7 +8,7 @@ COPY ./config/zabbix/zabbix_agentd.conf /etc/zabbix/zabbix_agentd.conf
 COPY ./entrypoint.sh /entrypoint.sh
 
 RUN \
-	apk add --no-cache zabbix-agent=2.4.7-r1 \
+	apk add --no-cache zabbix-agent=2.4.8-r0 \
 	&& rm -rf /var/cache/apk/* \
 	&& mkdir -p /etc/zabbix/zabbix_agentd.d \
 	&& apk add --no-cache rsyslog
