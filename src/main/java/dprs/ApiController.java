@@ -14,7 +14,8 @@ import java.util.List;
 public class ApiController {
     private static final Logger logger = LoggerFactory.getLogger(ApiController.class);
 
-    PersonDao personDao = new PersonDao();
+    @Autowired
+    PersonDao personDao;
 
     @RequestMapping("/testread")
     public List<Person> testRead() {
