@@ -1,11 +1,11 @@
-package hello;
+package dprs;
 
 import com.ecwid.consul.v1.ConsulClient;
 import com.ecwid.consul.v1.QueryParams;
 import com.ecwid.consul.v1.agent.model.Member;
 import com.ecwid.consul.v1.catalog.model.CatalogService;
-import hello.struct.HealthResponse;
-import hello.struct.StatusResponse;
+import dprs.struct.HealthResponse;
+import dprs.struct.StatusResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,7 +35,6 @@ public class ConsulController {
 
     @RequestMapping("/health")
     public HealthResponse getHealth() {
-        logger.info("Requesting health status from " + consulClient.getAgentSelf().getValue().getMember().getAddress());
         return new HealthResponse();
     }
 

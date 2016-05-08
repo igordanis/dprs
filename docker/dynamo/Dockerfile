@@ -6,6 +6,7 @@ COPY ./config/dynamo/application.properties /application.properties
 COPY ./config/rsyslog /etc/rsyslog.d
 COPY ./config/zabbix/zabbix_agentd.conf /etc/zabbix/zabbix_agentd.conf
 COPY ./entrypoint.sh /entrypoint.sh
+ADD ./dprs-0.0.1.jar app.jar
 
 RUN \
 	apk add --no-cache zabbix-agent=2.4.8-r0 \
@@ -13,7 +14,6 @@ RUN \
 	&& mkdir -p /etc/zabbix/zabbix_agentd.d \
 	&& apk add --no-cache rsyslog
 
-ADD ./dprs-0.0.1.jar app.jar
 
 # Download consul
 ADD https://releases.hashicorp.com/consul/0.6.4/consul_0.6.4_linux_amd64.zip /tmp/consul.zip
@@ -21,6 +21,15 @@ RUN cd /bin && unzip /tmp/consul.zip && chmod +x /bin/consul && rm /tmp/consul.z
 RUN mkdir -p /etc/consul
 
 RUN sh -c 'touch /app.jar'
+
+# Install Elasticsearch
+ENV ES_PKG_NAME elasticsearch-1.7.3
+ADD ./$ES_PKG_NAME.zip $ES_PKG_NAME.zip
+RUN \
+    unzip $ES_PKG_NAME.zip && \
+    rm -f $ES_PKG_NAME.zip && \
+    mv /$ES_PKG_NAME /elasticsearch && \
+    chmod 755 elasticsearch/bin/elasticsearch
 
 #otvorenie portov:
 #	8080 	->	spring boot

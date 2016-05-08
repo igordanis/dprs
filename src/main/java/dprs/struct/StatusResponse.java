@@ -1,4 +1,4 @@
-package hello.struct;
+package dprs.struct;
 
 import java.util.Map;
 

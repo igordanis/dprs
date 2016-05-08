@@ -1,4 +1,4 @@
-package hello.struct;
+package dprs.struct;
 
 public class HealthResponse {
     boolean status = true;
