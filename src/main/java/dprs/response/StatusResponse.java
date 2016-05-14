@@ -1,4 +1,4 @@
-package dprs.struct;
+package dprs.response;
 
 import java.util.Map;
 
