@@ -16,13 +16,15 @@ public class NodeAddress implements Comparable<NodeAddress> {
         this.address = address;
     }
 
-    public String hash() {
-        return address;
-    }
 
     @Override
     public int compareTo(NodeAddress nodeAddress) {
-        return hash().compareTo(nodeAddress.hash());
+        return address.compareTo(nodeAddress.getAddress());
+    }
+
+    @Override
+    public boolean equals(Object nodeAddress) {
+        return address.equals(((NodeAddress) nodeAddress).getAddress());
     }
 
     @Override

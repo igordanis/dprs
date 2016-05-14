@@ -1,5 +1,7 @@
 package dprs.controller;
 
+import dprs.entity.DatabaseEntry;
+import dprs.response.TransportDataResponse;
 import dprs.service.BackupService;
 import dprs.InMemoryDatabase;
 import dprs.entity.NodeAddress;
@@ -11,11 +13,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.HashMap;
+import java.util.Map;
 
 @EnableAutoConfiguration
 @EnableDiscoveryClient
@@ -23,13 +27,14 @@ import java.util.HashMap;
 public class ApiController {
     private static final Logger logger = LoggerFactory.getLogger(ApiController.class);
 
-    private static final String READ = "/read";
-    private static final String SAVE = "/save";
+    public static final String READ = "/read";
+    public static final String SAVE = "/save";
+    public static final String TRANSPORT_DATA = "/transportData";
 
     @Autowired
     BackupService backupService;
-    @Value("${spring.application.name}")
-    int writeQuorum;
+    @Value("${backup.max}")
+    int defaultMaxBackups;
 
     @RequestMapping(READ)
     public ReadResponse readAll() {
@@ -40,23 +45,31 @@ public class ApiController {
     public SaveResponse saveValue(@RequestParam(value = "key") String key,
                                   @RequestParam(value = "value") int value,
                                   @RequestParam(value = "backup", defaultValue = "true") boolean backup,
-                                  @RequestParam(value = "writeQuorum", required = false) Integer writeQuorum) {
-        writeQuorum = writeQuorum != null ? writeQuorum : this.writeQuorum;
+                                  @RequestParam(value = "maxBackups", required = false) Integer maxBackups,
+                                  @RequestParam(value = "currentBackup", required = false) Integer currentBackup) {
+        if (currentBackup == null) {
+            currentBackup = defaultMaxBackups;
+        }
         int quorum = 1;
-
         InMemoryDatabase database = InMemoryDatabase.INSTANCE;
-        database.put(key, value);
+
+        // TODO update vectorClock functionality
+        String vectorClock = "default";
+
+        DatabaseEntry entry = new DatabaseEntry(value, vectorClock, maxBackups, currentBackup);
+        database.put(key, entry);
 
         if (backup) {
             HashMap<String, Object> params = new HashMap<>();
             params.put("key", key);
             params.put("value", value);
             params.put("backup", false);
+            params.put("maxBackups", maxBackups);
 
-            backupService.updateNodeAddresses();
+            for (int i = 1; i < currentBackup; i++) {
+                params.put("currentBackup", currentBackup - i);
 
-            for (int i = 1; i < writeQuorum; i++) {
-                NodeAddress address = backupService.getNextAddress(i);
+                NodeAddress address = backupService.getAddressByOffset(i);
                 if (address != null) {
                     if (backupService.sendData(address.getAddress(), SAVE, params) != null) {
                         quorum++;
@@ -66,5 +79,18 @@ public class ApiController {
         }
 
         return new SaveResponse(quorum);
+    }
+
+    @RequestMapping(TRANSPORT_DATA)
+    public TransportDataResponse transportData(@RequestParam(value = "data") Map data) {
+        InMemoryDatabase database = InMemoryDatabase.INSTANCE;
+        database.putAll(data);
+        return new TransportDataResponse(true);
+    }
+
+//    @Scheduled(fixedDelay = 5000)
+    @RequestMapping("/update")
+    public void updateNodeAddresses() {
+        backupService.updateNodeAddresses();
     }
 }
