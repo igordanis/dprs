@@ -4,6 +4,7 @@ import com.ecwid.consul.v1.ConsulClient;
 import com.ecwid.consul.v1.QueryParams;
 import com.ecwid.consul.v1.agent.model.Member;
 import com.ecwid.consul.v1.catalog.model.CatalogService;
+import com.ecwid.consul.v1.health.model.HealthService;
 import dprs.struct.HealthResponse;
 import dprs.struct.StatusResponse;
 import org.slf4j.Logger;
@@ -19,6 +20,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @EnableAutoConfiguration

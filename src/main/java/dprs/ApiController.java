@@ -1,30 +1,34 @@
 package dprs;
 
-import dprs.domain.PersonDao;
-import dprs.entity.Person;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @RestController
 public class ApiController {
     private static final Logger logger = LoggerFactory.getLogger(ApiController.class);
 
-    @Autowired
-    PersonDao personDao;
+    private static final String maxBackups = "3";
 
     @RequestMapping("/testread")
-    public List<Person> testRead() {
-        return personDao.getAllPersons();
+    public List<Integer> testRead() {
+        InMemoryDatabase map = InMemoryDatabase.INSTANCE;
+        List<Integer> values = new ArrayList<>();
+        for (Object key : map.keySet()) {
+            values.add((Integer) map.get(key));
+        }
+        return values;
     }
 
     @RequestMapping("/testsave")
-    public String testSave() {
-        logger.info("Calling test save");
-        return "Saved person with id: " + personDao.savePerson(new Person("Janko", "Hrasko"));
+    public void testsave(@RequestParam(value = "key") String key, @RequestParam(value = "value") int value) {
+        InMemoryDatabase map = InMemoryDatabase.INSTANCE;
+        map.put(key, value);
     }
+
 }
