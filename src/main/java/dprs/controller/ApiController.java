@@ -6,7 +6,7 @@ import dprs.components.InMemoryDatabase;
 import dprs.entity.DatabaseEntry;
 import dprs.entity.NodeAddress;
 import dprs.exceptions.WriteException;
-import dprs.response.ReadResponse;
+import dprs.response.ReadAllResponse;
 import dprs.response.SaveResponse;
 import dprs.response.TransportDataResponse;
 import dprs.service.BackupService;
@@ -32,7 +32,7 @@ import java.util.HashMap;
 public class ApiController {
     private static final Logger logger = LoggerFactory.getLogger(ApiController.class);
 
-    public static final String READ = "/read";
+    public static final String READ_ALL = "/readAll";
     public static final String SAVE = "/save";
     public static final String TRANSPORT_DATA = "/transportData";
 
@@ -43,9 +43,9 @@ public class ApiController {
     @Value("${quorum.write}")
     int defaultWriteQuorum;
 
-    @RequestMapping(READ)
-    public ReadResponse readAll() {
-        return new ReadResponse(new HashMap(InMemoryDatabase.INSTANCE));
+    @RequestMapping(READ_ALL)
+    public ReadAllResponse readAll() {
+        return new ReadAllResponse(new HashMap(InMemoryDatabase.INSTANCE));
     }
 
     @RequestMapping(SAVE)
