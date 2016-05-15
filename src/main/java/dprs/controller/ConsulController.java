@@ -1,11 +1,15 @@
-package dprs;
+package dprs.controller;
 
 import com.ecwid.consul.v1.ConsulClient;
 import com.ecwid.consul.v1.QueryParams;
 import com.ecwid.consul.v1.agent.model.Member;
 import com.ecwid.consul.v1.catalog.model.CatalogService;
-import dprs.struct.HealthResponse;
-import dprs.struct.StatusResponse;
+import dprs.InMemoryDatabase;
+import dprs.entity.NodeAddress;
+import dprs.response.AllDataResponse;
+import dprs.response.HealthResponse;
+import dprs.response.StatusResponse;
+import dprs.service.BackupService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,12 +18,13 @@ import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
 import java.net.InetAddress;
-import java.util.GregorianCalendar;
-import java.util.HashMap;
-import java.util.Map;
+import java.net.URI;
+import java.util.*;
 
 @EnableAutoConfiguration
 @EnableDiscoveryClient
@@ -29,6 +34,9 @@ public class ConsulController {
 
     @Autowired
     ConsulClient consulClient;
+
+    @Autowired
+    BackupService backupService;
 
     @Value("${spring.application.name}")
     String applicationName;
@@ -61,6 +69,33 @@ public class ConsulController {
                 discoveryMap,
                 serviceMap
         );
+    }
+
+    @RequestMapping("/allData")
+    public AllDataResponse getAllData() {
+        StringBuilder allDataBuilder = new StringBuilder();
+        List<NodeAddress> addressList = backupService.getAllAddresses();
+
+        for (NodeAddress address : addressList) {
+            allDataBuilder.append(address + "\n");
+            URI uri = UriComponentsBuilder.fromUriString("http://" + address.getAddress() + ":8080").path("/myData").build().toUri();
+            List<Object> values = (List<Object>) new RestTemplate().getForObject(uri, List.class);
+            for (Object value : values) {
+                allDataBuilder.append(value + "n");
+            }
+        }
+
+        return new AllDataResponse(allDataBuilder.toString());
+    }
+
+    @RequestMapping("/myData")
+    public List<Object> getMyData() {
+        InMemoryDatabase database = InMemoryDatabase.INSTANCE;
+        List<Object> data = new ArrayList<>();
+        for (Object key : database.keySet()) {
+            data.add(key + ":" + database.get(key));
+        }
+        return data;
     }
 
     public String ping(String address) {
