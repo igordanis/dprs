@@ -1,35 +1,35 @@
 version: '2'
 services:
 
-    zabbix-db-storage:
-      image: busybox:latest
-      volumes:
-        - /var/lib/mysql
-
-    zabbix-db:
-      image: zabbix/zabbix-db-mariadb
-      volumes:
-        - /backups:/backups
-        - /etc/localtime:/etc/localtime:ro
-      volumes_from:
-        - zabbix-db-storage
-      environment:
-        - MARIADB_USER=zabbix
-        - MARIADB_PASS=my_password
-
-    zabbix-server:
-      image: zabbix/zabbix-3.0:latest
-      ports:
-        - "80:80"
-        - "10051:10051"
-      volumes:
-        - /etc/localtime:/etc/localtime:ro
-      links:
-        - zabbix-db:zabbix.db
-      environment:
-        - ZS_DBHost=zabbix.db
-        - ZS_DBUser=zabbix
-        - ZS_DBPassword=my_password
+#    zabbix-db-storage:
+#      image: busybox:latest
+#      volumes:
+#        - /var/lib/mysql
+#
+#    zabbix-db:
+#      image: zabbix/zabbix-db-mariadb
+#      volumes:
+#        - /backups:/backups
+#        - /etc/localtime:/etc/localtime:ro
+#      volumes_from:
+#        - zabbix-db-storage
+#      environment:
+#        - MARIADB_USER=zabbix
+#        - MARIADB_PASS=my_password
+#
+#    zabbix-server:
+#      image: zabbix/zabbix-3.0:latest
+#      ports:
+#        - "80:80"
+#        - "10051:10051"
+#      volumes:
+#        - /etc/localtime:/etc/localtime:ro
+#      links:
+#        - zabbix-db:zabbix.db
+#      environment:
+#        - ZS_DBHost=zabbix.db
+#        - ZS_DBUser=zabbix
+#        - ZS_DBPassword=my_password
 
     # Access ip addresses at http://localhost:8500/v1/catalog/service/web-service
     # Required SERVICE_TAGS web for dynamic registration
@@ -39,11 +39,26 @@ services:
           SERVICE_80_NAME: dynamo
           SERVICE_NAME: dynamo
           SERVICE_TAGS: dynamo
+           - "constraint:node==swarm-node-02"
         ports:
           - "8080"
-        links:
-          - "consulserver:consul"
+        depends_on:
+          - consulserver
           - logstash
+
+    dynamo2:
+        build: ./docker/dynamo
+        environment:
+          SERVICE_80_NAME: dynamo
+          SERVICE_NAME: dynamo
+          SERVICE_TAGS: dynamo
+           - "constraint:node==swarm-node-03"
+        ports:
+          - "8080"
+        depends_on:
+          - consulserver
+          - logstash
+
 
     # Run only once
     consulserver:
@@ -56,17 +71,21 @@ services:
            - "8400"
            - "8500"
            - "53"
-        command: -data-dir /tmp/consul -bootstrap -client 0.0.0.0 -node consulservers
+        volumes:
+           - ./docker/consul:/tmp/consul2
+        entrypoint:
+           - /tmp/consul2/entrypoint.sh
+
 
     # Run only once - access application through ip address of this docker-machine (ip:8080)
     proxy:
         build: ./docker/proxy
         container_name: 'load-balancer'
-        links:
-          - "consulserver:consul"
         ports:
           - "8080:8080"
           - "8081"
+        depends_on:
+          - consulserver
 
     elasticsearch:
       image: elasticsearch:latest
@@ -75,6 +94,7 @@ services:
         - "9200:9200"
         - "9300:9300"
 
+
     logstash:
       image: logstash:latest
       command: logstash -f /etc/logstash/conf.d/logstash.conf
@@ -82,12 +102,10 @@ services:
         - ./docker/logstash/config:/etc/logstash/conf.d
       ports:
         - "5000:5000"
-      links:
-        - elasticsearch
       environment:
         - LS_HEAP_SIZE=256m
-  #    depends_on:
-  #     - elasticsearch
+      depends_on:
+       - elasticsearch
 
     kibana:
       build: ./docker/kibana/
@@ -95,5 +113,6 @@ services:
         - ./docker/kibana/config/:/opt/kibana/config/
       ports:
         - "5601:5601"
-      links:
-        - elasticsearch
+      depends_on:
+       - elasticsearch
+
