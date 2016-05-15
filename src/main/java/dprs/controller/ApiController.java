@@ -25,7 +25,6 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
 import java.util.HashMap;
-import java.util.Set;
 
 @EnableAutoConfiguration
 @EnableDiscoveryClient
@@ -36,12 +35,13 @@ public class ApiController {
     public static final String READ = "/read";
     public static final String SAVE = "/save";
     public static final String TRANSPORT_DATA = "/transportData";
-    public static final String CLEAR_DATA = "/clearData";
 
     @Autowired
     BackupService backupService;
     @Value("${backup.max}")
     int defaultMaxBackups;
+    @Value("${quorum.write}")
+    int defaultWriteQuorum;
 
     @RequestMapping(READ)
     public ReadResponse readAll() {
@@ -53,8 +53,8 @@ public class ApiController {
                                   @RequestParam(value = "value") int value,
                                   @RequestParam(value = "backup", defaultValue = "true") boolean backup,
                                   @RequestParam(value = "maxBackups", required = false) Integer maxBackups,
-                                  @RequestParam(value = "currentBackup", required = false) Integer currentBackup) {
-        logger.info("Saving " + key + ":" + value);
+                                  @RequestParam(value = "currentBackup", required = false) Integer currentBackup,
+                                  @RequestParam(value = "writeQuorum", required = false) Integer writeQuorum) {
         NodeAddress address = backupService.getAddressByHash(key.hashCode());
 
         if (backup && address != null && !address.getAddress().equals(backupService.getAddressSelf().getAddress())) {
@@ -68,19 +68,23 @@ public class ApiController {
                         .queryParam("backup", backup)
                         .queryParam("maxBackups", maxBackups)
                         .queryParam("currentBackup", currentBackup)
+                        .queryParam("writeQuorum", writeQuorum)
                         .build().toUri();
                 logger.info("Redirecting to " + uri.toString());
                 return new RestTemplate().getForObject(uri, SaveResponse.class);
             }
         } else {
-            return saveValueRedirected(key, value, backup, maxBackups, currentBackup);
+            return saveValueRedirected(key, value, backup, maxBackups, currentBackup, writeQuorum);
         }
 
     }
 
-    private SaveResponse saveValueRedirected(String key, int value, boolean backup, Integer maxBackups, Integer currentBackup) {
+    private SaveResponse saveValueRedirected(String key, int value, boolean backup, Integer maxBackups, Integer currentBackup, Integer writeQuorum) {
+        logger.info("Saving " + key + ":" + value);
+
         currentBackup = currentBackup == null ? defaultMaxBackups : currentBackup;
         maxBackups = maxBackups == null ? defaultMaxBackups : maxBackups;
+        writeQuorum = writeQuorum == null ? defaultWriteQuorum : writeQuorum;
         int quorum = 1;
         InMemoryDatabase database = InMemoryDatabase.INSTANCE;
 
@@ -109,7 +113,7 @@ public class ApiController {
             }
         }
 
-        return new SaveResponse(quorum);
+        return new SaveResponse(quorum >= writeQuorum);
     }
 
     @RequestMapping(TRANSPORT_DATA)

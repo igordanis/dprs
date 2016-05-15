@@ -2,21 +2,25 @@ package dprs.response;
 
 public class SaveResponse extends ResponseWithException {
 
-    private int writeQuorum;
+    private boolean successful;
 
-    public SaveResponse() {}
-
-    public SaveResponse(Exception exception) {super(exception);}
-
-    public SaveResponse(int writeQuorum) {
-        this.writeQuorum = writeQuorum;
+    public SaveResponse() {
     }
 
-    public int getWriteQuorum() {
-        return writeQuorum;
+    public SaveResponse(Exception exception) {
+        super(exception);
+        successful = false;
     }
 
-    public void setWriteQuorum(int writeQuorum) {
-        this.writeQuorum = writeQuorum;
+    public SaveResponse(boolean successful) {
+        this.successful = successful;
+    }
+
+    public boolean isSuccessful() {
+        return successful;
+    }
+
+    public void setSuccessful(boolean successful) {
+        this.successful = successful;
     }
 }
