@@ -2,7 +2,7 @@ package dprs.controller;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-import dprs.InMemoryDatabase;
+import dprs.components.InMemoryDatabase;
 import dprs.entity.DatabaseEntry;
 import dprs.entity.NodeAddress;
 import dprs.response.ReadResponse;
@@ -24,7 +24,6 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
 import java.util.HashMap;
-import java.util.List;
 
 @EnableAutoConfiguration
 @EnableDiscoveryClient

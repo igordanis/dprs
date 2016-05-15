@@ -3,7 +3,7 @@ package dprs.service;
 import com.ecwid.consul.v1.ConsulClient;
 import com.ecwid.consul.v1.QueryParams;
 import com.google.gson.Gson;
-import dprs.InMemoryDatabase;
+import dprs.components.InMemoryDatabase;
 import dprs.controller.ApiController;
 import dprs.entity.DatabaseEntry;
 import dprs.entity.NodeAddress;
