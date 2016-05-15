@@ -5,6 +5,7 @@ import com.ecwid.consul.v1.QueryParams;
 import com.ecwid.consul.v1.agent.model.Member;
 import com.ecwid.consul.v1.catalog.model.CatalogService;
 import dprs.components.InMemoryDatabase;
+import dprs.entity.DatabaseEntry;
 import dprs.entity.NodeAddress;
 import dprs.response.AllDataResponse;
 import dprs.response.GetAddressRangesResponse;
@@ -27,6 +28,8 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.URI;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentHashMap.KeySetView;
 
 @EnableAutoConfiguration
 @EnableDiscoveryClient
@@ -133,7 +136,7 @@ public class ConsulController {
     @RequestMapping(CLEAR_DATA)
     public void clearData(@RequestParam(value = "first") boolean first) {
         InMemoryDatabase database = InMemoryDatabase.INSTANCE;
-        Set<Object> keySet = database.keySet();
+        final KeySetView<String, DatabaseEntry> keySet = database.keySet();
         keySet.forEach(database::remove);
         if (first) {
             for (NodeAddress address : backupService.getAllAddresses()) {

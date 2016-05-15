@@ -5,6 +5,7 @@ import com.google.gson.reflect.TypeToken;
 import dprs.components.InMemoryDatabase;
 import dprs.entity.DatabaseEntry;
 import dprs.entity.NodeAddress;
+import dprs.entity.VectorClock;
 import dprs.exceptions.ReadException;
 import dprs.exceptions.WriteException;
 import dprs.response.ReadAllResponse;
@@ -45,6 +46,8 @@ public class ApiController {
     int defaultMaxBackups;
     @Value("${quorum.write}")
     int defaultWriteQuorum;
+
+    private InMemoryDatabase database = InMemoryDatabase.INSTANCE;
 
     @RequestMapping(READ_ALL)
     public ReadAllResponse readAll() {
@@ -114,12 +117,9 @@ public class ApiController {
         maxBackups = maxBackups == null ? defaultMaxBackups : maxBackups;
         writeQuorum = writeQuorum == null ? defaultWriteQuorum : writeQuorum;
         int quorum = 1;
-        InMemoryDatabase database = InMemoryDatabase.INSTANCE;
 
-        // TODO update vectorClock functionality
-        String vectorClock = "default";
 
-        DatabaseEntry entry = new DatabaseEntry(value, vectorClock, maxBackups, currentBackup);
+        DatabaseEntry entry = new DatabaseEntry(value, new VectorClock(), maxBackups, currentBackup);
         database.put(key, entry);
 
         if (backup) {
