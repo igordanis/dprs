@@ -45,8 +45,6 @@ public class BackupService {
         }
         URI targetUrl = builder.build().toUri();
 
-        logger.info("URI: " + targetUrl);
-
         try {
             return new RestTemplate().getForObject(targetUrl, Object.class);
         } catch (Exception e) {
@@ -56,6 +54,10 @@ public class BackupService {
     }
 
     public Object transportData(int offset, Map<Object, DatabaseEntry> data) {
+        if (data.size() == 0) {
+            return null;
+        }
+
         Map<String, Object> params = new HashMap<>();
         params.put("data", new Gson().toJson(data));
         NodeAddress address = getAddressByOffset(offset);
@@ -116,14 +118,14 @@ public class BackupService {
 
         for (int i = 0; i < addressList.size(); i++) {
             int[] range = new int[2];
-            if (i == addressList.size() - 1) {
-                range[0] = Integer.MAX_VALUE;
+            if (i == 0) {
+                range[0] = Integer.MIN_VALUE;
             } else {
-                range[0] = addressList.get(i + 1).getHash() + 1;
+                range[0] = addressList.get(i - 1).getHash() + 1;
             }
 
-            if (i == 0) {
-                range[1] = Integer.MIN_VALUE;
+            if (i == addressList.size() - 1) {
+                range[1] = Integer.MAX_VALUE;
             } else {
                 range[1] = addressList.get(i).getHash();
             }
@@ -139,15 +141,13 @@ public class BackupService {
         NodeAddress nextNode = getAddressByOffset(1);
         addressList = updatedAddressList;
         updateAddressRanges();
-        logger.info("Changed addressList to " +addressList);
 
-        // handle failure of next node or new next node
-        if (nextNode != null && (!addressList.contains(nextNode)
-                || (getAddressByOffset(1) != null && !getAddressByOffset(1).equals(nextNode)
-        ))) {
-            logger.info(addressSelf.getAddress() + ": Next node failed or new next node!");
+        // handle failure of next node
+        if (nextNode != null && !addressList.contains(nextNode)) {
+            logger.info(addressSelf.getAddress() + ": Next node failed");
             Map<Object, DatabaseEntry> data = databaseDeepCopy();
 
+            // update currentBackups for following nodes
             for (int i = 1; data.size() > 0; i++) {
                 increaseAllCurrentBackupValues(data, -1);
                 data = data.entrySet().stream().filter(value ->
@@ -157,28 +157,41 @@ public class BackupService {
             }
         }
 
-        // handle failure of next node
-        if (nextNode != null && !addressList.contains(nextNode)) {
-
-        }
-
         // handle failure of previous node
         if (previousNode != null && !addressList.contains(previousNode)) {
             logger.info(addressSelf.getAddress() + ": Previous node failed!");
             Map<Object, DatabaseEntry> data = databaseDeepCopy();
 
+            // send all values that were stored on failed node to previous node (only first copies)
+            increaseAllCurrentBackupValues(data, 1);
+            data = data.entrySet().stream().filter(value ->
+                    value.getValue().getCurrentBackup() == value.getValue().getMaxBackups()
+            ).collect(Collectors.toMap(p -> p.getKey(), p -> p.getValue()));
+            transportData(-1, data);
+        }
+
+        // handle new next node
+        if (nextNode != null && !nextNode.equals(getAddressByOffset(1))) {
+            logger.info(addressSelf.getAddress() + ": New next node!");
+            Map<Object, DatabaseEntry> data = databaseDeepCopy();
+            NodeAddress newNextNode = getAddressByOffset(1);
+
+            // collect part of data that should be transported to new node
+            Map<Object, DatabaseEntry> dataForNextNode = data.entrySet().stream().filter(value ->
+                    getAddressByHash(value.getKey().hashCode()).getAddress().equals(newNextNode.getAddress())
+                    && value.getValue().getCurrentBackup() == value.getValue().getMaxBackups()
+            ).collect(Collectors.toMap(p -> p.getKey(), p -> p.getValue()));
+            transportData(1, dataForNextNode);
+
+            // update currentBackups for following nodes
+            dataForNextNode.keySet().forEach(data::remove);
             for (int i = 1; data.size() > 0; i++) {
-                increaseAllCurrentBackupValues(data, 1);
+                increaseAllCurrentBackupValues(data, -1);
                 data = data.entrySet().stream().filter(value ->
-                        value.getValue().getCurrentBackup() <= value.getValue().getMaxBackups()
+                        value.getValue().getCurrentBackup() > 0
                 ).collect(Collectors.toMap(p -> p.getKey(), p -> p.getValue()));
                 transportData(i, data);
             }
-        }
-
-        // handle new previous node
-        if (previousNode != null && !getAddressByOffset(-1).equals(previousNode)) {
-            logger.info(addressSelf.getAddress() + ": New previous node!");
         }
     }
 
@@ -203,7 +216,7 @@ public class BackupService {
     public NodeAddress getAddressByHash(int hash) {
         for (int i = 0; i < addressRangeList.size(); i++) {
             int[] range = addressRangeList.get(i);
-            if (hash >= range[1] && hash <= range[0]) {
+            if (hash >= range[0] && hash <= range[1]) {
                 return addressList.get(i);
             }
         }

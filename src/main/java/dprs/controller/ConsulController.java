@@ -18,6 +18,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -33,6 +34,13 @@ import java.util.*;
 public class ConsulController {
     private static final Logger logger = LoggerFactory.getLogger(ConsulController.class);
 
+    public static final String STATUS = "/";
+    public static final String HEALTH = "/health";
+    public static final String CLEAR_DATA = "/clearData";
+    public static final String ADDRESS_RANGES = "/addressRanges";
+    public static final String ALL_DATA = "/allData";
+    public static final String MY_DATA = "/myData";
+
     @Autowired
     ConsulClient consulClient;
 
@@ -42,12 +50,12 @@ public class ConsulController {
     @Value("${spring.application.name}")
     String applicationName;
 
-    @RequestMapping("/health")
+    @RequestMapping(HEALTH)
     public HealthResponse getHealth() {
         return new HealthResponse();
     }
 
-    @RequestMapping("/")
+    @RequestMapping(STATUS)
     public StatusResponse getStatus() {
         logger.info("Requesting status from " + consulClient.getAgentSelf().getValue().getMember().getAddress());
         Map<String, String> serviceMap = new HashMap<>();
@@ -72,7 +80,7 @@ public class ConsulController {
         );
     }
 
-    @RequestMapping("/addressRanges")
+    @RequestMapping(ADDRESS_RANGES)
     public GetAddressRangesResponse getAddressRanges() {
         List<NodeAddress> addressList = backupService.getAllAddresses();
         List<int[]> rangeList = backupService.getAddressRangeList();
@@ -85,20 +93,20 @@ public class ConsulController {
         return new GetAddressRangesResponse(data);
     }
 
-    @RequestMapping("/allData")
+    @RequestMapping(ALL_DATA)
     public AllDataResponse getAllData() {
         HashMap<String, Object> data = new HashMap<>();
         List<NodeAddress> addressList = backupService.getAllAddresses();
 
         for (NodeAddress address : addressList) {
-            URI uri = UriComponentsBuilder.fromUriString("http://" + address.getAddress() + ":8080").path("/myData").build().toUri();
+            URI uri = UriComponentsBuilder.fromUriString("http://" + address.getAddress() + ":8080").path(MY_DATA).build().toUri();
             data.put(address.getAddress(), new RestTemplate().getForObject(uri, List.class));
         }
 
         return new AllDataResponse(data);
     }
 
-    @RequestMapping("/myData")
+    @RequestMapping(MY_DATA)
     public List<Object> getMyData() {
         InMemoryDatabase database = InMemoryDatabase.INSTANCE;
         List<Object> data = new ArrayList<>();
@@ -120,5 +128,23 @@ public class ConsulController {
         }
 
         return "Not reachable.";
+    }
+
+    @RequestMapping(CLEAR_DATA)
+    public void clearData(@RequestParam(value = "first") boolean first) {
+        InMemoryDatabase database = InMemoryDatabase.INSTANCE;
+        Set<Object> keySet = database.keySet();
+        keySet.forEach(database::remove);
+        if (first) {
+            for (NodeAddress address : backupService.getAllAddresses()) {
+                if (!address.equals(backupService.getAddressSelf())) {
+                    URI uri = UriComponentsBuilder.fromUriString("http://" + address.getAddress() + ":8080")
+                            .path(CLEAR_DATA)
+                            .queryParam("first", false)
+                            .build().toUri();
+                    new RestTemplate().delete(uri);
+                }
+            }
+        }
     }
 }

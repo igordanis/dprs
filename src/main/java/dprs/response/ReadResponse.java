@@ -2,9 +2,13 @@ package dprs.response;
 
 import java.util.HashMap;
 
-public class ReadResponse {
+public class ReadResponse extends ResponseWithException {
 
     HashMap values;
+
+    public ReadResponse() {}
+
+    public ReadResponse(Exception exception) {super(exception);}
 
     public ReadResponse(HashMap values) {
         this.values = values;

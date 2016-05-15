@@ -5,6 +5,7 @@ import com.google.gson.reflect.TypeToken;
 import dprs.components.InMemoryDatabase;
 import dprs.entity.DatabaseEntry;
 import dprs.entity.NodeAddress;
+import dprs.exceptions.WriteException;
 import dprs.response.ReadResponse;
 import dprs.response.SaveResponse;
 import dprs.response.TransportDataResponse;
@@ -24,6 +25,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
 import java.util.HashMap;
+import java.util.Set;
 
 @EnableAutoConfiguration
 @EnableDiscoveryClient
@@ -34,6 +36,7 @@ public class ApiController {
     public static final String READ = "/read";
     public static final String SAVE = "/save";
     public static final String TRANSPORT_DATA = "/transportData";
+    public static final String CLEAR_DATA = "/clearData";
 
     @Autowired
     BackupService backupService;
@@ -51,12 +54,12 @@ public class ApiController {
                                   @RequestParam(value = "backup", defaultValue = "true") boolean backup,
                                   @RequestParam(value = "maxBackups", required = false) Integer maxBackups,
                                   @RequestParam(value = "currentBackup", required = false) Integer currentBackup) {
-        logger.info("Saving " + key.hashCode());
+        logger.info("Saving " + key + ":" + value);
         NodeAddress address = backupService.getAddressByHash(key.hashCode());
 
-        if (backup && !address.getAddress().equals(backupService.getAddressSelf().getAddress())) {
+        if (backup && address != null && !address.getAddress().equals(backupService.getAddressSelf().getAddress())) {
             if (address == null) {
-                return null;
+                return new SaveResponse(new WriteException(""));
             } else {
                 // TODO update params vectorClock functionality
                 URI uri = UriComponentsBuilder.fromUriString("http://" + address.getAddress() + ":8080").path(SAVE)
@@ -117,6 +120,7 @@ public class ApiController {
                 .fromJson(data, new TypeToken<HashMap<String, DatabaseEntry>>() {
                 }.getType());
 
+        logger.info("Received data: " + data);
         database.putAll(dataMap);
         return new TransportDataResponse(true);
     }
