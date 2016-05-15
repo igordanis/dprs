@@ -24,7 +24,7 @@ public class NodeAddress implements Comparable<NodeAddress> {
 
     @Override
     public boolean equals(Object nodeAddress) {
-        return address.equals(((NodeAddress) nodeAddress).getAddress());
+        return nodeAddress == null || address.equals(((NodeAddress) nodeAddress).getAddress());
     }
 
     @Override

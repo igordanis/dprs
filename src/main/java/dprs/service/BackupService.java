@@ -2,7 +2,10 @@ package dprs.service;
 
 import com.ecwid.consul.v1.ConsulClient;
 import com.ecwid.consul.v1.QueryParams;
+import com.google.gson.Gson;
 import dprs.InMemoryDatabase;
+import dprs.controller.ApiController;
+import dprs.entity.DatabaseEntry;
 import dprs.entity.NodeAddress;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,7 +35,7 @@ public class BackupService {
     String applicationName;
 
     public Object sendData(String address, String path, Map<String, Object> params) {
-        logger.info("Seding data from " + addressSelf.getAddress() + " to " + address);
+        logger.info("Sending data from " + addressSelf.getAddress() + " to " + address);
 
         UriComponentsBuilder builder = UriComponentsBuilder.fromUriString("http://" + address + ":8080").path(path);
 
@@ -49,6 +52,18 @@ public class BackupService {
         }
     }
 
+    public Object transportData(int offset, Map<Object, DatabaseEntry> data) {
+        Map<String, Object> params = new HashMap<>();
+        params.put("data", new Gson().toJson(data));
+        NodeAddress address = getAddressByOffset(offset);
+        if (address != null) {
+            return sendData(getAddressByOffset(offset).getAddress(), ApiController.TRANSPORT_DATA, params);
+        } else {
+            logger.error("Address was null. " + "Offset: " + offset);
+            return null;
+        }
+    }
+
     public NodeAddress getAddressByOffset(int offset) {
         int index = -1;
         for (int i = 0; i < addressList.size(); i++) {
@@ -58,9 +73,15 @@ public class BackupService {
             }
         }
 
-        return offset >= addressList.size() || index == -1 ?
-                null :
-                addressList.get((index + offset) % addressList.size());
+        if (offset > addressList.size() || offset < -addressList.size() || index == -1) {
+            return null;
+        } else {
+            index = (index + offset) % addressList.size();
+            while (index < 0) {
+                index += addressList.size();
+            }
+            return addressList.get(index);
+        }
     }
 
     public List<NodeAddress> updateNodeAddresses() {
@@ -69,7 +90,6 @@ public class BackupService {
         if (addressSelf == null) {
             addressSelf = new NodeAddress(consulClient.getAgentSelf().getValue().getMember().getAddress());
         }
-        logger.info(addressSelf.getAddress() + ": Calling update node addresses..");
 
         addressList.addAll(
                 consulClient.getHealthServices(applicationName, true, QueryParams.DEFAULT).getValue()
@@ -78,7 +98,7 @@ public class BackupService {
                 ).sorted().collect(Collectors.toList())
         );
 
-        if (this.addressList == null) {
+        if (this.addressList == null || this.addressList.isEmpty()) {
             this.addressList = addressList;
         } else if (!addressList.equals(this.addressList)) {
             backupData(addressList);
@@ -88,24 +108,67 @@ public class BackupService {
     }
 
     private void backupData(List<NodeAddress> updatedAddressList) {
-        InMemoryDatabase database = InMemoryDatabase.INSTANCE;
+        logger.info(addressSelf.getAddress() + ": Calling backup data.. " + addressList);
         NodeAddress previousNode = getAddressByOffset(-1);
         NodeAddress nextNode = getAddressByOffset(1);
         addressList = updatedAddressList;
+        logger.info("Changed addressList to " +addressList);
 
-        if (!addressList.contains(nextNode)) {
-            Map data = new HashMap<>(database);
-        }
-        if (!addressList.contains(previousNode)) {
-            // handle failure of previous node
+        // handle failure of next node or new next node
+        if (nextNode != null && (!addressList.contains(nextNode)
+                || (getAddressByOffset(1) != null && !getAddressByOffset(1).equals(nextNode)
+        ))) {
+            logger.info(addressSelf.getAddress() + ": Next node failed or new next node!");
+            Map<Object, DatabaseEntry> data = databaseDeepCopy();
+
+            for (int i = 1; data.size() > 0; i++) {
+                increaseAllCurrentBackupValues(data, -1);
+                data = data.entrySet().stream().filter(value ->
+                        value.getValue().getCurrentBackup() > 0
+                ).collect(Collectors.toMap(p -> p.getKey(), p -> p.getValue()));
+                transportData(i, data);
+            }
         }
 
+        // handle failure of previous node
+        if (previousNode != null && !addressList.contains(previousNode)) {
+            logger.info(addressSelf.getAddress() + ": Previous node failed!");
+            Map<Object, DatabaseEntry> data = databaseDeepCopy();
 
-        if (!getAddressByOffset(1).equals(nextNode)) {
-            // handle new next node
+            for (int i = 1; data.size() > 0; i++) {
+                increaseAllCurrentBackupValues(data, 1);
+                data = data.entrySet().stream().filter(value ->
+                        value.getValue().getCurrentBackup() <= value.getValue().getMaxBackups()
+                ).collect(Collectors.toMap(p -> p.getKey(), p -> p.getValue()));
+                transportData(i, data);
+            }
         }
-        if (!getAddressByOffset(-1).equals(previousNode)) {
-            // handle new previous node
+
+        // handle new previous node
+        if (previousNode != null && !getAddressByOffset(-1).equals(previousNode)) {
+            logger.info(addressSelf.getAddress() + ": New previous node!");
         }
+    }
+
+    private Map<Object, DatabaseEntry> databaseDeepCopy() {
+        InMemoryDatabase database = InMemoryDatabase.INSTANCE;
+        Map<Object, DatabaseEntry> deepCopy = new HashMap<>();
+
+        for (Object key : database.keySet()) {
+            deepCopy.put(key, new DatabaseEntry((DatabaseEntry) database.get(key)));
+        }
+        return deepCopy;
+    }
+
+    private Map<Object, DatabaseEntry> increaseAllCurrentBackupValues(Map<Object, DatabaseEntry> data, int addedValue) {
+        for (Object key : data.keySet()) {
+            DatabaseEntry value = data.get(key);
+            value.setCurrentBackup(value.getCurrentBackup() + addedValue);
+        }
+        return data;
+    }
+
+    public List<NodeAddress> getAllAddresses() {
+        return addressList;
     }
 }

@@ -1,12 +1,14 @@
 package dprs.controller;
 
-import dprs.entity.DatabaseEntry;
-import dprs.response.TransportDataResponse;
-import dprs.service.BackupService;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 import dprs.InMemoryDatabase;
+import dprs.entity.DatabaseEntry;
 import dprs.entity.NodeAddress;
 import dprs.response.ReadResponse;
 import dprs.response.SaveResponse;
+import dprs.response.TransportDataResponse;
+import dprs.service.BackupService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,7 +21,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.HashMap;
-import java.util.Map;
 
 @EnableAutoConfiguration
 @EnableDiscoveryClient
@@ -47,9 +48,8 @@ public class ApiController {
                                   @RequestParam(value = "backup", defaultValue = "true") boolean backup,
                                   @RequestParam(value = "maxBackups", required = false) Integer maxBackups,
                                   @RequestParam(value = "currentBackup", required = false) Integer currentBackup) {
-        if (currentBackup == null) {
-            currentBackup = defaultMaxBackups;
-        }
+        currentBackup = currentBackup == null ? defaultMaxBackups : currentBackup;
+        maxBackups = maxBackups == null ? defaultMaxBackups : maxBackups;
         int quorum = 1;
         InMemoryDatabase database = InMemoryDatabase.INSTANCE;
 
@@ -82,14 +82,17 @@ public class ApiController {
     }
 
     @RequestMapping(TRANSPORT_DATA)
-    public TransportDataResponse transportData(@RequestParam(value = "data") Map data) {
+    public TransportDataResponse transportData(@RequestParam(value = "data") String data) {
         InMemoryDatabase database = InMemoryDatabase.INSTANCE;
-        database.putAll(data);
+
+        HashMap<String, DatabaseEntry> dataMap = new Gson()
+                .fromJson(data, new TypeToken<HashMap<String, DatabaseEntry>>() {}.getType());
+
+        database.putAll(dataMap);
         return new TransportDataResponse(true);
     }
 
-//    @Scheduled(fixedDelay = 5000)
-    @RequestMapping("/update")
+    @Scheduled(fixedDelay = 5000)
     public void updateNodeAddresses() {
         backupService.updateNodeAddresses();
     }
