@@ -1,45 +1,53 @@
 package dprs.entity;
 
+import com.google.gson.Gson;
+
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * @author Martin
- */
+
 public class VectorClock {
-    Map<Integer, Integer> vectorClock;
-    int myNodeId;
-    int replicaNumber = 3;
+    private Map<Integer, Integer> vectorClock = new HashMap();
 
-    // constructor for initial setup
-    public VectorClock(int number, int nodeId) {
-        vectorClock = new HashMap();
-        myNodeId = nodeId;
-        this.replicaNumber = number;
-        for (int i = 0; i < replicaNumber; i++)
-            vectorClock.put(i, 0);
+    public void incrementValueForComponent(final Integer component) {
+        vectorClock.computeIfPresent(component, (key, oldValue) -> oldValue++);
     }
 
-    // to change replica number
-    public void addReplica() {
-        replicaNumber++;
-        vectorClock.put(replicaNumber - 1, 0);
+    public boolean isThisNewerThan(final VectorClock other, final Integer byComponent) {
+        return compareToByComponent(other, byComponent) == 1;
+    }
+    /*
+    * Vrati
+    *   0 ak su rovnake
+    *   -1 ak je this starsi
+    *   1 ak je this novsi
+    */
+    private int compareToByComponent(final VectorClock other, final Integer component) {
+        final Integer otherValue = other.vectorClock.get(component);
+        final Integer thisValue = this.vectorClock.get(component);
+
+        if (thisValue == null && otherValue == null)
+            return 0;
+        if (thisValue != null && otherValue == null)
+            return 1;
+        if (thisValue == null && otherValue != null)
+            return -1;
+        //if(thisValue != null && otherValue != null)
+        return thisValue.compareTo(otherValue);
     }
 
-    // add or update query for this node
-    public void addVectorFromThisNode(int value) {
-        vectorClock.put(myNodeId, value);
+    private void setValueForComponent(final Integer component, final Integer newValue) {
+        vectorClock.computeIfPresent(component, (key, oldValue) -> newValue);
+        vectorClock.computeIfAbsent(component, key -> newValue);
     }
 
-    // adding or updating from node
-    public void addVectorFromOtherNode(VectorClock v, int from) {
-        vectorClock.put(from, (Integer) v.GetVectorClock().get(from));
-        vectorClock.put(myNodeId, (Integer) v.GetVectorClock().get(from));
+
+    public String toJSON() {
+        return new Gson().toJson(this);
     }
 
-    // return VectorClock
-    public Map GetVectorClock() {
-        return vectorClock;
+    public static VectorClock fromJSON(String json) {
+        return new Gson().fromJson(json, VectorClock.class);
     }
 
 }
