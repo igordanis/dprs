@@ -3,17 +3,17 @@ package dprs.response;
 import java.util.HashMap;
 
 public class AllDataResponse {
-    private String data;
+    private HashMap<String, Object> data;
 
-    public AllDataResponse(String data) {
+    public AllDataResponse(HashMap<String, Object> data) {
         this.data = data;
     }
 
-    public String getData() {
+    public HashMap<String, Object> getData() {
         return data;
     }
 
-    public void setData(String data) {
+    public void setData(HashMap<String, Object> data) {
         this.data = data;
     }
 }

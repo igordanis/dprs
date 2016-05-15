@@ -28,6 +28,7 @@ public class BackupService {
 
     private NodeAddress addressSelf = null;
     private List<NodeAddress> addressList = null;
+    private List<int[]> addressRangeList = null;
 
     @Autowired
     ConsulClient consulClient;
@@ -43,6 +44,8 @@ public class BackupService {
             builder.queryParam(key, params.get(key));
         }
         URI targetUrl = builder.build().toUri();
+
+        logger.info("URI: " + targetUrl);
 
         try {
             return new RestTemplate().getForObject(targetUrl, Object.class);
@@ -100,6 +103,7 @@ public class BackupService {
 
         if (this.addressList == null || this.addressList.isEmpty()) {
             this.addressList = addressList;
+            updateAddressRanges();
         } else if (!addressList.equals(this.addressList)) {
             backupData(addressList);
         }
@@ -107,11 +111,34 @@ public class BackupService {
         return addressList;
     }
 
+    public List<int[]> updateAddressRanges() {
+        addressRangeList = new ArrayList<>(addressList.size());
+
+        for (int i = 0; i < addressList.size(); i++) {
+            int[] range = new int[2];
+            if (i == addressList.size() - 1) {
+                range[0] = Integer.MAX_VALUE;
+            } else {
+                range[0] = addressList.get(i + 1).getHash() + 1;
+            }
+
+            if (i == 0) {
+                range[1] = Integer.MIN_VALUE;
+            } else {
+                range[1] = addressList.get(i).getHash();
+            }
+            addressRangeList.add(i, range);
+        }
+
+        return addressRangeList;
+    }
+
     private void backupData(List<NodeAddress> updatedAddressList) {
         logger.info(addressSelf.getAddress() + ": Calling backup data.. " + addressList);
         NodeAddress previousNode = getAddressByOffset(-1);
         NodeAddress nextNode = getAddressByOffset(1);
         addressList = updatedAddressList;
+        updateAddressRanges();
         logger.info("Changed addressList to " +addressList);
 
         // handle failure of next node or new next node
@@ -128,6 +155,11 @@ public class BackupService {
                 ).collect(Collectors.toMap(p -> p.getKey(), p -> p.getValue()));
                 transportData(i, data);
             }
+        }
+
+        // handle failure of next node
+        if (nextNode != null && !addressList.contains(nextNode)) {
+
         }
 
         // handle failure of previous node
@@ -168,7 +200,25 @@ public class BackupService {
         return data;
     }
 
+    public NodeAddress getAddressByHash(int hash) {
+        for (int i = 0; i < addressRangeList.size(); i++) {
+            int[] range = addressRangeList.get(i);
+            if (hash >= range[1] && hash <= range[0]) {
+                return addressList.get(i);
+            }
+        }
+        return null;
+    }
+
     public List<NodeAddress> getAllAddresses() {
         return addressList;
+    }
+
+    public List<int[]> getAddressRangeList() {
+        return addressRangeList;
+    }
+
+    public NodeAddress getAddressSelf() {
+        return addressSelf;
     }
 }

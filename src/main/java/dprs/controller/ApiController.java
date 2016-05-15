@@ -19,8 +19,12 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
+import java.net.URI;
 import java.util.HashMap;
+import java.util.List;
 
 @EnableAutoConfiguration
 @EnableDiscoveryClient
@@ -48,6 +52,31 @@ public class ApiController {
                                   @RequestParam(value = "backup", defaultValue = "true") boolean backup,
                                   @RequestParam(value = "maxBackups", required = false) Integer maxBackups,
                                   @RequestParam(value = "currentBackup", required = false) Integer currentBackup) {
+        logger.info("Saving " + key.hashCode());
+        NodeAddress address = backupService.getAddressByHash(key.hashCode());
+
+        if (backup && !address.getAddress().equals(backupService.getAddressSelf().getAddress())) {
+            if (address == null) {
+                return null;
+            } else {
+                // TODO update params vectorClock functionality
+                URI uri = UriComponentsBuilder.fromUriString("http://" + address.getAddress() + ":8080").path(SAVE)
+                        .queryParam("key", key)
+                        .queryParam("value", value)
+                        .queryParam("backup", backup)
+                        .queryParam("maxBackups", maxBackups)
+                        .queryParam("currentBackup", currentBackup)
+                        .build().toUri();
+                logger.info("Redirecting to " + uri.toString());
+                return new RestTemplate().getForObject(uri, SaveResponse.class);
+            }
+        } else {
+            return saveValueRedirected(key, value, backup, maxBackups, currentBackup);
+        }
+
+    }
+
+    private SaveResponse saveValueRedirected(String key, int value, boolean backup, Integer maxBackups, Integer currentBackup) {
         currentBackup = currentBackup == null ? defaultMaxBackups : currentBackup;
         maxBackups = maxBackups == null ? defaultMaxBackups : maxBackups;
         int quorum = 1;
@@ -86,7 +115,8 @@ public class ApiController {
         InMemoryDatabase database = InMemoryDatabase.INSTANCE;
 
         HashMap<String, DatabaseEntry> dataMap = new Gson()
-                .fromJson(data, new TypeToken<HashMap<String, DatabaseEntry>>() {}.getType());
+                .fromJson(data, new TypeToken<HashMap<String, DatabaseEntry>>() {
+                }.getType());
 
         database.putAll(dataMap);
         return new TransportDataResponse(true);

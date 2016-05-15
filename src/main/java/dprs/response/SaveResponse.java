@@ -4,6 +4,8 @@ public class SaveResponse {
 
     private int writeQuorum;
 
+    public SaveResponse() {}
+
     public SaveResponse(int writeQuorum) {
         this.writeQuorum = writeQuorum;
     }

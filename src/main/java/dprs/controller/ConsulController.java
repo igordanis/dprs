@@ -7,6 +7,7 @@ import com.ecwid.consul.v1.catalog.model.CatalogService;
 import dprs.InMemoryDatabase;
 import dprs.entity.NodeAddress;
 import dprs.response.AllDataResponse;
+import dprs.response.GetAddressRangesResponse;
 import dprs.response.HealthResponse;
 import dprs.response.StatusResponse;
 import dprs.service.BackupService;
@@ -71,21 +72,30 @@ public class ConsulController {
         );
     }
 
+    @RequestMapping("/addressRanges")
+    public GetAddressRangesResponse getAddressRanges() {
+        List<NodeAddress> addressList = backupService.getAllAddresses();
+        List<int[]> rangeList = backupService.getAddressRangeList();
+
+        HashMap<String, int[]> data = new HashMap<>();
+        for (int i = 0; i < addressList.size(); i++) {
+            data.put(addressList.get(i).getAddress(), rangeList.get(i));
+        }
+
+        return new GetAddressRangesResponse(data);
+    }
+
     @RequestMapping("/allData")
     public AllDataResponse getAllData() {
-        StringBuilder allDataBuilder = new StringBuilder();
+        HashMap<String, Object> data = new HashMap<>();
         List<NodeAddress> addressList = backupService.getAllAddresses();
 
         for (NodeAddress address : addressList) {
-            allDataBuilder.append(address + "\n");
             URI uri = UriComponentsBuilder.fromUriString("http://" + address.getAddress() + ":8080").path("/myData").build().toUri();
-            List<Object> values = (List<Object>) new RestTemplate().getForObject(uri, List.class);
-            for (Object value : values) {
-                allDataBuilder.append(value + "n");
-            }
+            data.put(address.getAddress(), new RestTemplate().getForObject(uri, List.class));
         }
 
-        return new AllDataResponse(allDataBuilder.toString());
+        return new AllDataResponse(data);
     }
 
     @RequestMapping("/myData")
