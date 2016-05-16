@@ -94,6 +94,7 @@ public class BackupService {
 
     @Scheduled(fixedDelay = 5000)
     public void updateNodeAddresses() {
+        logger.info("Polling actual chord state");
         List<NodeAddress> addressList = new ArrayList<>();
 
         if (addressSelf == null) {
@@ -243,6 +244,6 @@ public class BackupService {
         if (myAddress < keyAddress) {
             myAddress += addressList.size();
         }
-        return myAddress - keyAddress > 0 ? myAddress - keyAddress : writeQuorum;
+        return myAddress - keyAddress > 0 ? writeQuorum + keyAddress - myAddress : writeQuorum;
     }
 }

@@ -36,16 +36,9 @@ public class ConsulController {
 
     public static final String STATUS = "/";
     public static final String HEALTH = "/health";
-    public static final String CLEAR_DATA = "/clearData";
-    public static final String ADDRESS_RANGES = "/addressRanges";
-    public static final String ALL_DATA = "/allData";
-    public static final String MY_DATA = "/myData";
 
     @Autowired
     ConsulClient consulClient;
-
-    @Autowired
-    BackupService backupService;
 
     @Value("${spring.application.name}")
     String applicationName;
@@ -80,41 +73,6 @@ public class ConsulController {
         );
     }
 
-    @RequestMapping(ADDRESS_RANGES)
-    public GetAddressRangesResponse getAddressRanges() {
-        List<NodeAddress> addressList = backupService.getAllAddresses();
-        List<int[]> rangeList = backupService.getAddressRangeList();
-
-        HashMap<String, int[]> data = new HashMap<>();
-        for (int i = 0; i < addressList.size(); i++) {
-            data.put(addressList.get(i).getAddress(), rangeList.get(i));
-        }
-
-        return new GetAddressRangesResponse(data);
-    }
-
-    @RequestMapping(ALL_DATA)
-    public AllDataResponse getAllData() {
-        HashMap<String, Object> data = new HashMap<>();
-        List<NodeAddress> addressList = backupService.getAllAddresses();
-
-        for (NodeAddress address : addressList) {
-            URI uri = UriComponentsBuilder.fromUriString("http://" + address.getAddress() + ":8080").path(MY_DATA).build().toUri();
-            data.put(address.getAddress(), new RestTemplate().getForObject(uri, List.class));
-        }
-
-        return new AllDataResponse(data);
-    }
-
-    @RequestMapping(MY_DATA)
-    public List<Object> getMyData() {
-        InMemoryDatabase database = InMemoryDatabase.INSTANCE;
-        List<Object> data = new ArrayList<>();
-        for (Object key : database.keySet()) {
-            data.add(key + ":" + database.get(key));
-        }
-        return data;
-    }
 
     public String ping(String address) {
         try {
@@ -128,23 +86,5 @@ public class ConsulController {
         }
 
         return "Not reachable.";
-    }
-
-    @RequestMapping(CLEAR_DATA)
-    public void clearData(@RequestParam(value = "first") boolean first) {
-        InMemoryDatabase database = InMemoryDatabase.INSTANCE;
-        Set<Object> keySet = database.keySet();
-        keySet.forEach(database::remove);
-        if (first) {
-            for (NodeAddress address : backupService.getAllAddresses()) {
-                if (!address.equals(backupService.getAddressSelf())) {
-                    URI uri = UriComponentsBuilder.fromUriString("http://" + address.getAddress() + ":8080")
-                            .path(CLEAR_DATA)
-                            .queryParam("first", false)
-                            .build().toUri();
-                    new RestTemplate().delete(uri);
-                }
-            }
-        }
     }
 }

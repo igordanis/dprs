@@ -1,6 +1,7 @@
 package dprs.controller;
 
 import dprs.components.InMemoryDatabase;
+import dprs.entity.DatabaseEntry;
 import dprs.entity.NodeAddress;
 import dprs.response.AllDataResponse;
 import dprs.response.GetAddressRangesResponse;
@@ -19,7 +20,8 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 @EnableAutoConfiguration
 @RestController
@@ -35,16 +37,16 @@ public class UtilityController {
     BackupService backupService;
 
     @RequestMapping(CLEAR_DATA)
-    public void clearData(@RequestParam(value = "first") boolean first) {
+    public void clearData(@RequestParam(value = "redirected", defaultValue = "false") boolean redirected) {
         InMemoryDatabase database = InMemoryDatabase.INSTANCE;
-        Set<Object> keySet = database.keySet();
+        final ConcurrentHashMap.KeySetView<String, DatabaseEntry> keySet = database.keySet();
         keySet.forEach(database::remove);
-        if (first) {
+        if (!redirected) {
             for (NodeAddress address : backupService.getAllAddresses()) {
                 if (!address.equals(backupService.getAddressSelf())) {
                     URI uri = UriComponentsBuilder.fromUriString("http://" + address.getAddress() + ":8080")
                             .path(CLEAR_DATA)
-                            .queryParam("first", false)
+                            .queryParam("redirected", true)
                             .build().toUri();
                     new RestTemplate().delete(uri);
                 }
@@ -81,10 +83,8 @@ public class UtilityController {
     @RequestMapping(MY_DATA)
     public List<Object> getMyData() {
         InMemoryDatabase database = InMemoryDatabase.INSTANCE;
-        List<Object> data = new ArrayList<>();
-        for (Object key : database.keySet()) {
-            data.add(key + ":" + database.get(key));
-        }
+        List<Object> data = database.keySet().stream().map(key -> key + ":" + database.get(key))
+                .collect(Collectors.toList());
         return data;
     }
 

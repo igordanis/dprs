@@ -3,6 +3,7 @@ package dprs.controller;
 import dprs.components.InMemoryDatabase;
 import dprs.entity.DatabaseEntry;
 import dprs.entity.NodeAddress;
+import dprs.entity.VectorClock;
 import dprs.exceptions.WriteException;
 import dprs.response.SaveResponse;
 import dprs.service.BackupService;
@@ -65,10 +66,7 @@ public class WriteController {
         int quorum = 1;
         InMemoryDatabase database = InMemoryDatabase.INSTANCE;
 
-        // TODO update vectorClock functionality
-        String vectorClock = "default";
-
-        DatabaseEntry entry = new DatabaseEntry(value, vectorClock, writeQuorum, currentBackup);
+        DatabaseEntry entry = new DatabaseEntry(value, new VectorClock(), writeQuorum, currentBackup);
         database.put(key, entry);
 
         if (backupService.getAddressSelf().equals(backupService.getAddressByHash(key.hashCode()))) {
