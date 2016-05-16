@@ -1,4 +1,4 @@
-package dprs.response;
+package dprs.wthrash;
 
 public abstract class ResponseWithException {
     Exception exception;

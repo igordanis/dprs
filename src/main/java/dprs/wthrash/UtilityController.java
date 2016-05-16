@@ -1,19 +1,14 @@
-package dprs.controller;
+package dprs.wthrash;
 
 import dprs.components.InMemoryDatabase;
 import dprs.entity.DatabaseEntry;
 import dprs.entity.NodeAddress;
-import dprs.response.AllDataResponse;
-import dprs.response.GetAddressRangesResponse;
 import dprs.response.ReadAllResponse;
-import dprs.service.BackupService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -23,8 +18,8 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
-@EnableAutoConfiguration
-@RestController
+//@EnableAutoConfiguration
+//@RestController
 public class UtilityController {
     private static final Logger logger = LoggerFactory.getLogger(UtilityController.class);
 
@@ -45,7 +40,7 @@ public class UtilityController {
         if (!redirected) {
             for (NodeAddress address : backupService.getAllAddresses()) {
                 if (!address.equals(backupService.getSelfAddresss())) {
-                    URI uri = UriComponentsBuilder.fromUriString("http://" + address.getAddress() + ":8080")
+                    URI uri = UriComponentsBuilder.fromUriString("http://" + address.getIP() + ":8080")
                             .path(CLEAR_DATA)
                             .queryParam("redirected", true)
                             .build().toUri();
@@ -62,7 +57,7 @@ public class UtilityController {
 
         HashMap<String, int[]> data = new HashMap<>();
         for (int i = 0; i < addressList.size(); i++) {
-            data.put(addressList.get(i).getAddress(), rangeList.get(i));
+            data.put(addressList.get(i).getIP(), rangeList.get(i));
         }
 
         return new GetAddressRangesResponse(data);
@@ -74,8 +69,8 @@ public class UtilityController {
         List<NodeAddress> addressList = backupService.getAllAddresses();
 
         for (NodeAddress address : addressList) {
-            URI uri = UriComponentsBuilder.fromUriString("http://" + address.getAddress() + ":8080").path(MY_DATA).build().toUri();
-            data.put(address.getAddress(), new RestTemplate().getForObject(uri, List.class));
+            URI uri = UriComponentsBuilder.fromUriString("http://" + address.getIP() + ":8080").path(MY_DATA).build().toUri();
+            data.put(address.getIP(), new RestTemplate().getForObject(uri, List.class));
         }
 
         return new AllDataResponse(data);

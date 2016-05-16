@@ -67,7 +67,7 @@ public class ConsulController {
     }
 
 
-    public String ping(String address) {
+    private String ping(String address) {
         try {
             InetAddress inet = InetAddress.getByName(address);
             long startTime = new GregorianCalendar().getTimeInMillis();

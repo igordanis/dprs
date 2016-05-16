@@ -1,33 +1,40 @@
 package dprs.entity;
 
 public class DatabaseEntry {
-    Integer value;
+    String value;
     VectorClock vectorClock;
-    Integer maxBackups;
-    Integer currentBackup;
+
+
+    public DatabaseEntry(String value, VectorClock vectorClock) {
+        this.value = value;
+        this.vectorClock = vectorClock;
+    }
+
 
     public DatabaseEntry(Integer value, VectorClock vectorClock,
                          Integer maxBackups, Integer currentBackup) {
-        this.value = value;
+        this.value = value.toString();
         this.vectorClock = vectorClock;
-        this.maxBackups = maxBackups;
-        this.currentBackup = currentBackup;
+//        this.maxBackups = maxBackups;
+//        this.currentBackup = currentBackup;
     }
 
     public DatabaseEntry(DatabaseEntry source) {
         this.value = source.value;
         this.vectorClock = source.vectorClock;
-        this.maxBackups = source.maxBackups;
-        this.currentBackup = source.currentBackup;
+//        this.maxBackups = source.maxBackups;
+//        this.currentBackup = source.currentBackup;
     }
 
-    public Integer getValue() {
+
+    public String getValue() {
         return value;
     }
 
-    public void setValue(Integer value) {
+    public void setValue(String value) {
         this.value = value;
     }
+
 
     public VectorClock getVectorClock() {
         return vectorClock;
@@ -38,28 +45,35 @@ public class DatabaseEntry {
     }
 
     public Integer getMaxBackups() {
-        return maxBackups;
+//        return maxBackups;
+        return null;
     }
 
     public void setMaxBackups(Integer maxBackups) {
-        this.maxBackups = maxBackups;
+//        this.maxBackups = maxBackups;
     }
 
     public Integer getCurrentBackup() {
-        return currentBackup;
+//        return currentBackup;
+        return null;
     }
 
     public void setCurrentBackup(Integer currentBackup) {
-        this.currentBackup = currentBackup;
+//        this.currentBackup = currentBackup;
     }
 
     @Override
     public String toString() {
         return "DatabaseEntry{" +
                 "value=" + value +
-                ", vectorClock=" + vectorClock +
-                ", maxBackups=" + maxBackups +
-                ", currentBackup=" + currentBackup +
+                ", vectorClock=" + vectorClock.toJSON() +
+//                ", maxBackups=" + maxBackups +
+//                ", currentBackup=" + currentBackup +
                 '}';
     }
+
+
+
+//    Integer maxBackups;
+//    Integer currentBackup;
 }

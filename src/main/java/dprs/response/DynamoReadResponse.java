@@ -10,8 +10,8 @@ import java.util.Objects;
 public class DynamoReadResponse{
 
     String key;
-    VectorClock vectorClock;
-    Object value;
+    String vectorClock;
+    String value;
 
 
     public String getKey() {
@@ -22,19 +22,19 @@ public class DynamoReadResponse{
         this.key = key;
     }
 
-    public VectorClock getVectorClock() {
+    public String getVectorClock() {
         return this.vectorClock;
     }
 
-    public void setVectorClock(VectorClock vectorClock) {
+    public void setVectorClock(String vectorClock) {
         this.vectorClock = vectorClock;
     }
 
-    public Object getValue() {
+    public String getValue() {
         return this.value;
     }
 
-    public void setValue(Object value) {
+    public void setValue(String value) {
         this.value = value;
     }
 

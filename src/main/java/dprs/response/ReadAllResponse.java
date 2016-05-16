@@ -1,5 +1,7 @@
 package dprs.response;
 
+import dprs.wthrash.ResponseWithException;
+
 import java.util.HashMap;
 
 public class ReadAllResponse extends ResponseWithException {

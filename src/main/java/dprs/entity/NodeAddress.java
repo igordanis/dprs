@@ -1,53 +1,54 @@
 package dprs.entity;
 
-public class NodeAddress implements Comparable<NodeAddress> {
+import com.ecwid.consul.v1.catalog.model.CatalogService;
+
+public class NodeAddress {
 
     private String address;
     private int port;
 
-    public NodeAddress(String address) {
-        this.address = address;
-    }
 
     public NodeAddress(String address, int port) {
         this.address = address;
         this.port = port;
     }
 
-    public String getAddress() {
-        return address;
+    public NodeAddress(CatalogService catalogService) {
+        this(catalogService.getAddress(), catalogService.getServicePort());
     }
 
-    public void setAddress(String address) {
-        this.address = address;
+    public String getIP() {
+        return address;
     }
 
     public int getPort() {
         return port;
     }
 
-    public void setPort(int port) {
-        this.port = port;
-    }
-
     public Integer getHash() {
-        return new StringBuilder(address).reverse().toString().hashCode();
-    }
-
-    @Override
-    public int compareTo(NodeAddress nodeAddress) {
-        return getHash().compareTo(nodeAddress.getHash());
-    }
-
-    @Override
-    public boolean equals(Object nodeAddress) {
-        return nodeAddress == null || address.equals(((NodeAddress) nodeAddress).getAddress());
+        String s = address + ":" + port;
+        return new StringBuilder(s)
+                .reverse()
+                .toString()
+                .hashCode();
     }
 
     @Override
     public String toString() {
-        return "NodeAddress{" +
-                "address='" + address + '\'' +
-                '}';
+        return address + ":" + port;
     }
+
+
+//
+//    @Override
+//    public int compareTo(NodeAddress nodeAddress) {
+//        return getHash().compareTo(nodeAddress.getHash());
+//    }
+//
+//    @Override
+//    public boolean equals(Object nodeAddress) {
+//        return nodeAddress == null || address.equals(((NodeAddress) nodeAddress).getIP());
+//    }
+
+
 }

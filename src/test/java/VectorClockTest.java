@@ -37,13 +37,13 @@ public class VectorClockTest {
         newVK.setValueForComponent(1, 1);
         newVK.setValueForComponent(2, 1);
 
-        assertTrue(newVK.isThisNewerThan(oldVK, 0));
-        assertTrue(newVK.isThisNewerThan(oldVK, 1));
-        assertTrue(newVK.isThisNewerThan(oldVK, 2));
+        assertTrue(newVK.isThisEqualOrNewerThan(oldVK, 0));
+        assertTrue(newVK.isThisEqualOrNewerThan(oldVK, 1));
+        assertTrue(newVK.isThisEqualOrNewerThan(oldVK, 2));
 
-        assertFalse(oldVK.isThisNewerThan(newVK, 0));
-        assertFalse(oldVK.isThisNewerThan(newVK, 1));
-        assertFalse(oldVK.isThisNewerThan(newVK, 2));
+        assertFalse(oldVK.isThisEqualOrNewerThan(newVK, 0));
+        assertFalse(oldVK.isThisEqualOrNewerThan(newVK, 1));
+        assertFalse(oldVK.isThisEqualOrNewerThan(newVK, 2));
 
     }
 
@@ -51,13 +51,13 @@ public class VectorClockTest {
     @Test
     public void testJSON() throws Exception {
         VectorClock vk = new VectorClock();
-        vk.setValueForComponent(0, 0);
+        vk.setValueForComponent(-20, 0);
         vk.setValueForComponent(1, 0);
         vk.setValueForComponent(2, 0);
 
         final VectorClock deserializedClock = VectorClock.fromJSON(vk.toJSON());
 
-        assertFalse(deserializedClock.isThisNewerThan(vk,0));
+        assertTrue(deserializedClock.isThisEqualOrNewerThan(vk,0));
     }
 
      @Test
@@ -78,8 +78,8 @@ public class VectorClockTest {
         oldVk.incrementValueForComponent(0);
         oldVk.incrementValueForComponent(2);
         
-        assertFalse(oldVk.isThisNewerThan(vk,1));
-        assertFalse(oldVk.isThisNewerThan(vk,0));
-        assertTrue(oldVk.isThisNewerThan(vk,2));
+        assertTrue(oldVk.isThisEqualOrNewerThan(vk,1));
+        assertTrue(oldVk.isThisEqualOrNewerThan(vk,0));
+        assertTrue(oldVk.isThisEqualOrNewerThan(vk,2));
     }
 }

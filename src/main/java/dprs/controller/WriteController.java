@@ -4,9 +4,10 @@ import dprs.components.InMemoryDatabase;
 import dprs.entity.DatabaseEntry;
 import dprs.entity.NodeAddress;
 import dprs.entity.VectorClock;
-import dprs.exceptions.WriteException;
-import dprs.response.SaveResponse;
-import dprs.service.BackupService;
+import dprs.response.DynamoWriteResponse;
+import dprs.response.WriteResponse;
+//import dprs.wthrash.BackupService;
+import dprs.service.Chord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,85 +20,128 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
-import java.util.HashMap;
+import java.util.*;
+import java.util.stream.Collectors;
+
+import static java.util.UUID.randomUUID;
 
 @EnableAutoConfiguration
 @RestController
 public class WriteController {
     private static final Logger logger = LoggerFactory.getLogger(WriteController.class);
 
-    public static final String SAVE = "/save";
+    public static final String WRITE = "/write";
+    public static final String DYNAMO_WRITE = "/dynamoWrite";
 
     @Autowired
-    BackupService backupService;
+    Chord chord;
+
+//    BackupService backupService;
 
     @Value("${quorum.write}")
     int writeQuorum;
 
-    @RequestMapping(SAVE)
-    public SaveResponse redirectSave(@RequestParam(value = "key") String key,
-                                     @RequestParam(value = "value") int value,
-                                     @RequestParam(value = "vectorClock", required = false) String vectorClockJson,
-                                     @RequestParam(value = "redirected", defaultValue = "false") boolean redirected) {
-        NodeAddress address = backupService.getAddressByHash(key.hashCode());
 
-        if (!redirected && address != null && !address.getAddress().equals(backupService.getSelfAddresss().getAddress())) {
-            if (address == null) {
-                return new SaveResponse(new WriteException("Unknown target node for key."));
-            } else {
-                URI uri = UriComponentsBuilder.fromUriString("http://" + address.getAddress() + ":8080").path(SAVE)
-                        .queryParam("key", key)
-                        .queryParam("value", value)
-                        .queryParam("vectorClock", vectorClockJson)
-                        .build().toUri();
-                logger.info("Redirecting to " + uri.toString());
-                return new RestTemplate().getForObject(uri, SaveResponse.class);
-            }
+    @RequestMapping(WriteController.WRITE)
+    public WriteResponse write(
+            @RequestParam(value = "key") String key,
+            @RequestParam(value = "value") String value,
+            @RequestParam(value = "vectorClock", required = false) String vk
+    ) {
+        String transactionId = randomUUID().toString();
+        VectorClock deserializedClock = VectorClock.fromJSON(vk);
+        final VectorClock oldVectorClock;
+
+        /*
+         * Find part of chord which manages given key
+         */
+
+        List<NodeAddress> destinationAddresses = chord.findDestinationAdressesForKey(
+                key, writeQuorum);
+
+
+        if (deserializedClock == null || deserializedClock.getNumberOfComponents() == 0) {
+            final VectorClock newVC = new VectorClock();
+            destinationAddresses.forEach(destinationAddress -> newVC.setValueForComponent
+                    (destinationAddress.getHash(), 0));
+            oldVectorClock = newVC;
         } else {
-            return saveValue(key, value, vectorClockJson);
+            oldVectorClock = deserializedClock;
         }
 
+
+        /*
+         * Ziska write odpovede od vsetkych dynamo uzlov ktore maju zapisat objekt
+         */
+
+        Set<DynamoWriteResponse> allResponses = destinationAddresses.stream()
+                .map(destinationAddress -> {
+
+                    URI destinationUri = UriComponentsBuilder
+                            .fromUriString("http://" + destinationAddress.getIP() + ":" +
+                                    destinationAddress.getPort())
+                            .path(DYNAMO_WRITE)
+                            .queryParam("key", key)
+                            .queryParam("value", value)
+                            .queryParam("transactionId", transactionId)
+                            .queryParam("vectorClock", oldVectorClock.toJSON())
+                            .build()
+                            .toUri();
+
+                    logger.info(transactionId, "Forwarding write request to: "
+                            + destinationUri);
+
+                    return new RestTemplate()
+                            .getForObject(destinationUri, DynamoWriteResponse.class);
+
+                })
+                .collect(Collectors.toSet());
+
+        VectorClock vl = new VectorClock();
+        for(DynamoWriteResponse dynamoWriteResponse : allResponses){
+            vl = VectorClock.mergeNewest(vl, VectorClock.fromJSON(dynamoWriteResponse
+                    .getVectorClock()));
+        }
+
+        return new WriteResponse(vl, key);
     }
 
-    private SaveResponse saveValue(String key, int value, String vectorClockJson) {
-        logger.info("Saving " + key + ":" + value);
-        InMemoryDatabase database = InMemoryDatabase.INSTANCE;
 
-        int currentBackup = backupService.getCurrentBackup(key);
-        int quorum = 1;
+    @RequestMapping(WriteController.DYNAMO_WRITE)
+    public DynamoWriteResponse dynamoRead(
+            @RequestParam(value = "key") String key,
+            @RequestParam(value = "value") String value,
+            @RequestParam(value = "transactionId", required = true) String transactionId,
+            @RequestParam(value = "vectorClock", required = true) String vc
+    ) {
+        logger.info(transactionId + ": Received request for concrete write: " + key);
 
-        VectorClock vectorClock = VectorClock.fromJSON(vectorClockJson);
-        int index = backupService.getAddressSelfIndex();
-        vectorClock.incrementValueForComponent(index);
+        final VectorClock vectorClock = VectorClock.fromJSON(vc);
 
-        if (database.get(key) != null && !vectorClock.isThisNewerThan(database.get(key).getVectorClock(), index)) {
-            return new SaveResponse(new WriteException("A newer version already exists: " + database.get(key).getVectorClock().toJSON()));
-        }
+        final Integer selfIndexInChord = chord.getSelfIndexInChord();
 
-        DatabaseEntry entry = new DatabaseEntry(value, vectorClock, writeQuorum, currentBackup);
-        database.put(key, entry);
+        InMemoryDatabase.INSTANCE.computeIfPresent(key, (k, oldVal) -> {
 
-        if (backupService.getSelfAddresss().equals(backupService.getAddressByHash(key.hashCode()))) {
-            HashMap<String, Object> params = new HashMap<>();
-            params.put("key", key);
-            params.put("value", value);
-            params.put("vectorClock", vectorClock.toJSON());
-            params.put("redirected", true);
-
-            for (int i = 1; i < writeQuorum; i++) {
-
-                NodeAddress address = backupService.getAddressByOffset(i);
-                if (address != null) {
-                    if (backupService.sendData(address, SAVE, params) != null) {
-                        quorum++;
-                    }
-                }
+            if (vectorClock.isThisEqualOrNewerThan(oldVal.getVectorClock(), selfIndexInChord)) {
+                logger.info("New value has been updated");
+                vectorClock.incrementValueForComponent(selfIndexInChord);
+                return new DatabaseEntry(value, vectorClock);
+            } else {
+                logger.info("Old value has been kept");
+                return oldVal;
             }
-        }
+        });
 
-        return new SaveResponse(quorum >= writeQuorum, vectorClock.toJSON());
+        InMemoryDatabase.INSTANCE.computeIfAbsent(key, k  -> {
+            final VectorClock vectorClock1 = VectorClock.fromJSON(vc);
+            vectorClock1.incrementValueForComponent(selfIndexInChord);
+            return new DatabaseEntry(value,vectorClock1);
+        });
+
+
+        return new DynamoWriteResponse(true, vectorClock.toJSON());
     }
 
-
+    ;
 
 }

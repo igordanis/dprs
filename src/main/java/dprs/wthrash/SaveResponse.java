@@ -1,4 +1,6 @@
-package dprs.response;
+package dprs.wthrash;
+
+import dprs.wthrash.ResponseWithException;
 
 public class SaveResponse extends ResponseWithException {
 

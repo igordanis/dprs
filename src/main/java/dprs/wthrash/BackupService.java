@@ -1,11 +1,10 @@
-package dprs.service;
+package dprs.wthrash;
 
 import com.ecwid.consul.v1.ConsulClient;
 import com.ecwid.consul.v1.QueryParams;
 import com.ecwid.consul.v1.catalog.model.CatalogService;
 import com.google.gson.Gson;
 import dprs.components.InMemoryDatabase;
-import dprs.controller.TransportController;
 import dprs.entity.DatabaseEntry;
 import dprs.entity.NodeAddress;
 import org.slf4j.Logger;
@@ -13,7 +12,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -21,7 +19,7 @@ import java.net.URI;
 import java.util.*;
 import java.util.stream.Collectors;
 
-@Service
+//@Service
 public class BackupService {
     private static final Logger logger = LoggerFactory.getLogger(BackupService.class);
 
@@ -37,10 +35,10 @@ public class BackupService {
     int writeQuorum;
 
     public Object sendData(NodeAddress address, String path, Map<String, Object> params) {
-        logger.info("Sending data from " + addressSelf.getAddress() + " to " + address);
+        logger.info("Sending data from " + addressSelf.getIP() + " to " + address);
 
         UriComponentsBuilder builder = UriComponentsBuilder
-                .fromUriString("http://" + address.getAddress() + ":" + address.getPort())
+                .fromUriString("http://" + address.getIP() + ":" + address.getPort())
                 .path(path);
 
         for (String key : params.keySet()) {
@@ -75,7 +73,7 @@ public class BackupService {
     public NodeAddress getAddressByOffset(int offset) {
         int index = -1;
         for (int i = 0; i < addressList.size(); i++) {
-            if (addressList.get(i).getAddress().equals(addressSelf.getAddress())) {
+            if (addressList.get(i).getIP().equals(addressSelf.getIP())) {
                 index = i;
                 break;
             }
@@ -95,8 +93,8 @@ public class BackupService {
     public Optional<NodeAddress> getAddressByOffset(NodeAddress nodeAddress, int offset) {
 
         final Optional<NodeAddress> first = addressList.stream()
-                .filter(anyChordAddress -> anyChordAddress.getAddress()
-                        .equals(nodeAddress.getAddress()))
+                .filter(anyChordAddress -> anyChordAddress.getIP()
+                        .equals(nodeAddress.getIP()))
                 .findFirst();
 
         int providedNodeAddressIndex = addressList.indexOf(first.get());
@@ -123,13 +121,13 @@ public class BackupService {
         List<NodeAddress> chordAddresses = new ArrayList<>();
 
         if (addressSelf == null) {
-            addressSelf = new NodeAddress(consulClient.getAgentSelf().getValue().getMember().getAddress());
+//            addressSelf = new NodeAddress(consulClient.getAgentSelf().getValue().getMember().getIP());
         }
 
         List<CatalogService> catalogServiceList = consulClient.getCatalogService(applicationName, QueryParams.DEFAULT).getValue();
 
         chordAddresses.addAll(catalogServiceList.stream().map(service ->
-//      TODO mozno treba service.getAddress vymenit na "localhost" ked spustas na local
+//      TODO mozno treba service.getIP vymenit na "localhost" ked spustas na local
                         new NodeAddress(service.getAddress(), service.getServicePort())
         ).collect(Collectors.toList()));
 
@@ -164,7 +162,7 @@ public class BackupService {
     }
 
     private void backupData(List<NodeAddress> updatedAddressList) {
-        logger.info(addressSelf.getAddress() + ": Calling backup data.. " + addressList);
+        logger.info(addressSelf.getIP() + ": Calling backup data.. " + addressList);
         NodeAddress previousNode = getAddressByOffset(-1);
         NodeAddress nextNode = getAddressByOffset(1);
         addressList = updatedAddressList;
@@ -172,7 +170,7 @@ public class BackupService {
 
         // handle failure of next node
         if (nextNode != null && !addressList.contains(nextNode)) {
-            logger.info(addressSelf.getAddress() + ": Next node failed");
+            logger.info(addressSelf.getIP() + ": Next node failed");
             Map<Object, DatabaseEntry> data = databaseDeepCopy();
 
             // update currentBackups for following nodes
@@ -187,7 +185,7 @@ public class BackupService {
 
         // handle failure of previous node
         if (previousNode != null && !addressList.contains(previousNode)) {
-            logger.info(addressSelf.getAddress() + ": Previous node failed!");
+            logger.info(addressSelf.getIP() + ": Previous node failed!");
             Map<Object, DatabaseEntry> data = databaseDeepCopy();
 
             // send all values that were stored on failed node to previous node (only first copies)
@@ -200,13 +198,13 @@ public class BackupService {
 
         // handle new next node
         if (nextNode != null && !nextNode.equals(getAddressByOffset(1))) {
-            logger.info(addressSelf.getAddress() + ": New next node!");
+            logger.info(addressSelf.getIP() + ": New next node!");
             Map<Object, DatabaseEntry> data = databaseDeepCopy();
             NodeAddress newNextNode = getAddressByOffset(1);
 
             // collect part of data that should be transported to new node
             Map<Object, DatabaseEntry> dataForNextNode = data.entrySet().stream().filter(value ->
-                    getAddressByHash(value.getKey().hashCode()).getAddress().equals(newNextNode.getAddress())
+                    getAddressByHash(value.getKey().hashCode()).getIP().equals(newNextNode.getIP())
                             && value.getValue().getCurrentBackup() == value.getValue().getMaxBackups()
             ).collect(Collectors.toMap(p -> p.getKey(), p -> p.getValue()));
             transportData(1, dataForNextNode);
