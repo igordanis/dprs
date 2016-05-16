@@ -32,6 +32,7 @@ public class UtilityController {
     public static final String ADDRESS_RANGES = "/addressRanges";
     public static final String ALL_DATA = "/allData";
     public static final String MY_DATA = "/myData";
+    public static final String ALL_ADDRESSES = "/allAddresses";
 
     @Autowired
     BackupService backupService;
@@ -78,6 +79,11 @@ public class UtilityController {
         }
 
         return new AllDataResponse(data);
+    }
+
+    @RequestMapping(ALL_ADDRESSES)
+    public List<NodeAddress> getAllAddresses() {
+        return backupService.getAllAddresses();
     }
 
     @RequestMapping(MY_DATA)

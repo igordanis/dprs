@@ -2,6 +2,9 @@ package dprs.service;
 
 import com.ecwid.consul.v1.ConsulClient;
 import com.ecwid.consul.v1.QueryParams;
+import com.ecwid.consul.v1.agent.model.Member;
+import com.ecwid.consul.v1.catalog.model.CatalogService;
+import com.ecwid.consul.v1.health.model.HealthService;
 import com.google.gson.Gson;
 import dprs.components.InMemoryDatabase;
 import dprs.controller.TransportController;
@@ -38,10 +41,12 @@ public class BackupService {
     @Value("${quorum.write}")
     int writeQuorum;
 
-    public Object sendData(String address, String path, Map<String, Object> params) {
+    public Object sendData(NodeAddress address, String path, Map<String, Object> params) {
         logger.info("Sending data from " + addressSelf.getAddress() + " to " + address);
 
-        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString("http://" + address + ":8080").path(path);
+        UriComponentsBuilder builder = UriComponentsBuilder
+                .fromUriString("http://" + address.getAddress() + ":" + address.getPort())
+                .path(path);
 
         for (String key : params.keySet()) {
             builder.queryParam(key, params.get(key));
@@ -65,7 +70,7 @@ public class BackupService {
         params.put("data", new Gson().toJson(data));
         NodeAddress address = getAddressByOffset(offset);
         if (address != null) {
-            return sendData(getAddressByOffset(offset).getAddress(), TransportController.TRANSPORT_DATA, params);
+            return sendData(getAddressByOffset(offset), TransportController.TRANSPORT_DATA, params);
         } else {
             logger.error("Address was null. " + "Offset: " + offset);
             return null;
@@ -101,12 +106,12 @@ public class BackupService {
             addressSelf = new NodeAddress(consulClient.getAgentSelf().getValue().getMember().getAddress());
         }
 
-        addressList.addAll(
-                consulClient.getHealthServices(applicationName, true, QueryParams.DEFAULT).getValue()
-                        .stream().map(service ->
-                        new NodeAddress(service.getNode().getAddress())
-                ).sorted().collect(Collectors.toList())
-        );
+        List<CatalogService> catalogServiceList = consulClient.getCatalogService(applicationName, QueryParams.DEFAULT).getValue();
+
+        addressList.addAll(catalogServiceList.stream().map(service ->
+//                TODO mozno treba service.getAddress zamenit za "localhost" ked spustas na local
+                new NodeAddress(service.getAddress(), service.getServicePort())
+        ).collect(Collectors.toList()));
 
         if (this.addressList == null || this.addressList.isEmpty()) {
             this.addressList = addressList;

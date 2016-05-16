@@ -4,13 +4,8 @@ import com.ecwid.consul.v1.ConsulClient;
 import com.ecwid.consul.v1.QueryParams;
 import com.ecwid.consul.v1.agent.model.Member;
 import com.ecwid.consul.v1.catalog.model.CatalogService;
-import dprs.components.InMemoryDatabase;
-import dprs.entity.NodeAddress;
-import dprs.response.AllDataResponse;
-import dprs.response.GetAddressRangesResponse;
 import dprs.response.HealthResponse;
 import dprs.response.StatusResponse;
-import dprs.service.BackupService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,15 +13,13 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.client.RestTemplate;
-import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
 import java.net.InetAddress;
-import java.net.URI;
-import java.util.*;
+import java.util.GregorianCalendar;
+import java.util.HashMap;
+import java.util.Map;
 
 @EnableAutoConfiguration
 @EnableDiscoveryClient
@@ -53,7 +46,7 @@ public class ConsulController {
         logger.info("Requesting status from " + consulClient.getAgentSelf().getValue().getMember().getAddress());
         Map<String, String> serviceMap = new HashMap<>();
         for (CatalogService serviceInstance : consulClient.getCatalogService(applicationName, QueryParams.DEFAULT).getValue()) {
-            serviceMap.put(serviceInstance.getAddress(), ping(serviceInstance.getAddress()));
+            serviceMap.put(serviceInstance.getAddress() + ":" + serviceInstance.getServicePort(), ping(serviceInstance.getAddress()));
         }
 
         Map<String, String> discoveryMap = new HashMap<>();

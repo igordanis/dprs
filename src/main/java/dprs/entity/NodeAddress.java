@@ -3,9 +3,15 @@ package dprs.entity;
 public class NodeAddress implements Comparable<NodeAddress> {
 
     private String address;
+    private int port;
 
     public NodeAddress(String address) {
         this.address = address;
+    }
+
+    public NodeAddress(String address, int port) {
+        this.address = address;
+        this.port = port;
     }
 
     public String getAddress() {
@@ -14,6 +20,14 @@ public class NodeAddress implements Comparable<NodeAddress> {
 
     public void setAddress(String address) {
         this.address = address;
+    }
+
+    public int getPort() {
+        return port;
+    }
+
+    public void setPort(int port) {
+        this.port = port;
     }
 
     public Integer getHash() {

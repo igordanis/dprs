@@ -37,7 +37,7 @@ public class WriteController {
     @RequestMapping(SAVE)
     public SaveResponse redirectSave(@RequestParam(value = "key") String key,
                                      @RequestParam(value = "value") int value,
-                                     @RequestParam(value = "vectorClock") String vectorClockJson,
+                                     @RequestParam(value = "vectorClock", required = false) String vectorClockJson,
                                      @RequestParam(value = "redirected", defaultValue = "false") boolean redirected) {
         NodeAddress address = backupService.getAddressByHash(key.hashCode());
 
@@ -88,7 +88,7 @@ public class WriteController {
 
                 NodeAddress address = backupService.getAddressByOffset(i);
                 if (address != null) {
-                    if (backupService.sendData(address.getAddress(), SAVE, params) != null) {
+                    if (backupService.sendData(address, SAVE, params) != null) {
                         quorum++;
                     }
                 }
