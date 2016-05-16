@@ -75,7 +75,6 @@ public class ReadController {
         if (!redirected) {
             HashMap<String, Object> params = new HashMap<>();
             params.put("key", key);
-            params.put("value", readQuorum);
             params.put("redirected", true);
 
             for (int i = 1; i < readQuorum; i++) {
