@@ -40,7 +40,7 @@ public class WriteController {
                                      @RequestParam(value = "redirected", defaultValue = "false") boolean redirected) {
         NodeAddress address = backupService.getAddressByHash(key.hashCode());
 
-        if (!redirected && address != null && !address.getAddress().equals(backupService.getAddressSelf().getAddress())) {
+        if (!redirected && address != null && !address.getAddress().equals(backupService.getSelfAddresss().getAddress())) {
             if (address == null) {
                 return new SaveResponse(new WriteException(""));
             } else {
@@ -69,7 +69,7 @@ public class WriteController {
         DatabaseEntry entry = new DatabaseEntry(value, new VectorClock(), writeQuorum, currentBackup);
         database.put(key, entry);
 
-        if (backupService.getAddressSelf().equals(backupService.getAddressByHash(key.hashCode()))) {
+        if (backupService.getSelfAddresss().equals(backupService.getAddressByHash(key.hashCode()))) {
             HashMap<String, Object> params = new HashMap<>();
             params.put("key", key);
             params.put("value", value);
@@ -88,4 +88,7 @@ public class WriteController {
 
         return new SaveResponse(quorum >= writeQuorum);
     }
+
+
+
 }

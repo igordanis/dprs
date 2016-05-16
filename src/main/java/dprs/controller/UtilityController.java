@@ -5,6 +5,7 @@ import dprs.entity.DatabaseEntry;
 import dprs.entity.NodeAddress;
 import dprs.response.AllDataResponse;
 import dprs.response.GetAddressRangesResponse;
+import dprs.response.ReadAllResponse;
 import dprs.service.BackupService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,7 +18,6 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
@@ -43,7 +43,7 @@ public class UtilityController {
         keySet.forEach(database::remove);
         if (!redirected) {
             for (NodeAddress address : backupService.getAllAddresses()) {
-                if (!address.equals(backupService.getAddressSelf())) {
+                if (!address.equals(backupService.getSelfAddresss())) {
                     URI uri = UriComponentsBuilder.fromUriString("http://" + address.getAddress() + ":8080")
                             .path(CLEAR_DATA)
                             .queryParam("redirected", true)
@@ -88,4 +88,10 @@ public class UtilityController {
         return data;
     }
 
+
+    public static final String READ_ALL = "/readAll";
+    @RequestMapping(READ_ALL)
+    public ReadAllResponse readAll() {
+        return new ReadAllResponse(new HashMap(InMemoryDatabase.INSTANCE));
+    }
 }

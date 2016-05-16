@@ -234,13 +234,13 @@ public class BackupService {
         return addressRangeList;
     }
 
-    public NodeAddress getAddressSelf() {
+    public NodeAddress getSelfAddresss() {
         return addressSelf;
     }
 
     public int getCurrentBackup(String key) {
         int keyAddress = addressList.indexOf(getAddressByHash(key.hashCode()));
-        int myAddress = addressList.indexOf(getAddressSelf());
+        int myAddress = addressList.indexOf(getSelfAddresss());
         if (myAddress < keyAddress) {
             myAddress += addressList.size();
         }
