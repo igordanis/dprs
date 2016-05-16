@@ -43,7 +43,7 @@ public class WriteController {
 
         if (!redirected && address != null && !address.getAddress().equals(backupService.getSelfAddresss().getAddress())) {
             if (address == null) {
-                return new SaveResponse(new WriteException(""));
+                return new SaveResponse(new WriteException("Unknown target node for key."));
             } else {
                 URI uri = UriComponentsBuilder.fromUriString("http://" + address.getAddress() + ":8080").path(SAVE)
                         .queryParam("key", key)
@@ -68,8 +68,10 @@ public class WriteController {
 
         VectorClock vectorClock = VectorClock.fromJSON(vectorClockJson);
         int index = backupService.getAddressSelfIndex();
+        vectorClock.incrementValueForComponent(index);
+
         if (database.get(key) != null && !vectorClock.isThisNewerThan(database.get(key).getVectorClock(), index)) {
-            return new SaveResponse(new WriteException("A new version already exists."));
+            return new SaveResponse(new WriteException("A newer version already exists: " + database.get(key).getVectorClock().toJSON()));
         }
 
         DatabaseEntry entry = new DatabaseEntry(value, vectorClock, writeQuorum, currentBackup);
@@ -93,7 +95,7 @@ public class WriteController {
             }
         }
 
-        return new SaveResponse(quorum >= writeQuorum);
+        return new SaveResponse(quorum >= writeQuorum, vectorClock.toJSON());
     }
 
 

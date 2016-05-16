@@ -3,6 +3,7 @@ package dprs.response;
 public class SaveResponse extends ResponseWithException {
 
     private boolean successful;
+    private String vectorClock;
 
     public SaveResponse() {
     }
@@ -12,8 +13,9 @@ public class SaveResponse extends ResponseWithException {
         successful = false;
     }
 
-    public SaveResponse(boolean successful) {
+    public SaveResponse(boolean successful, String vectorClock) {
         this.successful = successful;
+        this.vectorClock = vectorClock;
     }
 
     public boolean isSuccessful() {
@@ -22,5 +24,13 @@ public class SaveResponse extends ResponseWithException {
 
     public void setSuccessful(boolean successful) {
         this.successful = successful;
+    }
+
+    public String getVectorClock() {
+        return vectorClock;
+    }
+
+    public void setVectorClock(String vectorClock) {
+        this.vectorClock = vectorClock;
     }
 }
