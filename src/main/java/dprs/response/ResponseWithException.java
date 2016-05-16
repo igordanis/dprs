@@ -1,7 +1,7 @@
 package dprs.response;
 
 public abstract class ResponseWithException {
-    private Exception exception;
+    Exception exception;
 
     public ResponseWithException() {
     }

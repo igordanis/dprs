@@ -2,11 +2,12 @@ package dprs.entity;
 
 public class DatabaseEntry {
     Integer value;
-    Object vectorClock;
+    VectorClock vectorClock;
     Integer maxBackups;
     Integer currentBackup;
 
-    public DatabaseEntry(Integer value, Object vectorClock, Integer maxBackups, Integer currentBackup) {
+    public DatabaseEntry(Integer value, VectorClock vectorClock,
+                         Integer maxBackups, Integer currentBackup) {
         this.value = value;
         this.vectorClock = vectorClock;
         this.maxBackups = maxBackups;
@@ -32,7 +33,7 @@ public class DatabaseEntry {
         return vectorClock;
     }
 
-    public void setVectorClock(Object vectorClock) {
+    public void setVectorClock(VectorClock vectorClock) {
         this.vectorClock = vectorClock;
     }
 
