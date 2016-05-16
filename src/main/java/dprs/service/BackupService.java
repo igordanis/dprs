@@ -4,13 +4,14 @@ import com.ecwid.consul.v1.ConsulClient;
 import com.ecwid.consul.v1.QueryParams;
 import com.google.gson.Gson;
 import dprs.components.InMemoryDatabase;
-import dprs.controller.ApiController;
+import dprs.controller.TransportController;
 import dprs.entity.DatabaseEntry;
 import dprs.entity.NodeAddress;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -34,6 +35,8 @@ public class BackupService {
     ConsulClient consulClient;
     @Value("${spring.application.name}")
     String applicationName;
+    @Value("${quorum.write}")
+    int writeQuorum;
 
     public Object sendData(String address, String path, Map<String, Object> params) {
         logger.info("Sending data from " + addressSelf.getAddress() + " to " + address);
@@ -62,7 +65,7 @@ public class BackupService {
         params.put("data", new Gson().toJson(data));
         NodeAddress address = getAddressByOffset(offset);
         if (address != null) {
-            return sendData(getAddressByOffset(offset).getAddress(), ApiController.TRANSPORT_DATA, params);
+            return sendData(getAddressByOffset(offset).getAddress(), TransportController.TRANSPORT_DATA, params);
         } else {
             logger.error("Address was null. " + "Offset: " + offset);
             return null;
@@ -89,7 +92,8 @@ public class BackupService {
         }
     }
 
-    public List<NodeAddress> updateNodeAddresses() {
+    @Scheduled(fixedDelay = 5000)
+    public void updateNodeAddresses() {
         List<NodeAddress> addressList = new ArrayList<>();
 
         if (addressSelf == null) {
@@ -109,8 +113,6 @@ public class BackupService {
         } else if (!addressList.equals(this.addressList)) {
             backupData(addressList);
         }
-
-        return addressList;
     }
 
     public List<int[]> updateAddressRanges() {
@@ -179,7 +181,7 @@ public class BackupService {
             // collect part of data that should be transported to new node
             Map<Object, DatabaseEntry> dataForNextNode = data.entrySet().stream().filter(value ->
                     getAddressByHash(value.getKey().hashCode()).getAddress().equals(newNextNode.getAddress())
-                    && value.getValue().getCurrentBackup() == value.getValue().getMaxBackups()
+                            && value.getValue().getCurrentBackup() == value.getValue().getMaxBackups()
             ).collect(Collectors.toMap(p -> p.getKey(), p -> p.getValue()));
             transportData(1, dataForNextNode);
 
@@ -233,5 +235,14 @@ public class BackupService {
 
     public NodeAddress getAddressSelf() {
         return addressSelf;
+    }
+
+    public int getCurrentBackup(String key) {
+        int keyAddress = addressList.indexOf(getAddressByHash(key.hashCode()));
+        int myAddress = addressList.indexOf(getAddressSelf());
+        if (myAddress < keyAddress) {
+            myAddress += addressList.size();
+        }
+        return myAddress - keyAddress > 0 ? myAddress - keyAddress : writeQuorum;
     }
 }
