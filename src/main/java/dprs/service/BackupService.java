@@ -2,6 +2,7 @@ package dprs.service;
 
 import com.ecwid.consul.v1.ConsulClient;
 import com.ecwid.consul.v1.QueryParams;
+import com.ecwid.consul.v1.catalog.model.CatalogService;
 import com.google.gson.Gson;
 import dprs.components.InMemoryDatabase;
 import dprs.controller.TransportController;
@@ -17,10 +18,7 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -67,7 +65,7 @@ public class BackupService {
         params.put("data", new Gson().toJson(data));
         NodeAddress address = getAddressByOffset(offset);
         if (address != null) {
-            return sendData(getAddressByOffset(offset).getAddress(), TransportController.TRANSPORT_DATA, params);
+            return sendData(getAddressByOffset(offset), TransportController.TRANSPORT_DATA, params);
         } else {
             logger.error("Address was null. " + "Offset: " + offset);
             return null;
@@ -94,10 +92,35 @@ public class BackupService {
         }
     }
 
+    public Optional<NodeAddress> getAddressByOffset(NodeAddress nodeAddress, int offset) {
+
+        final Optional<NodeAddress> first = addressList.stream()
+                .filter(anyChordAddress -> anyChordAddress.getAddress()
+                        .equals(nodeAddress.getAddress()))
+                .findFirst();
+
+        int providedNodeAddressIndex = addressList.indexOf(first.get());
+
+        if (offset > addressList.size()
+                || offset < -addressList.size()
+                || providedNodeAddressIndex == -1) {
+            return Optional.empty();
+        } else {
+            providedNodeAddressIndex =
+                    (providedNodeAddressIndex + offset) % addressList.size();
+
+            while (providedNodeAddressIndex < 0) {
+                providedNodeAddressIndex += addressList.size();
+            }
+
+            return Optional.of(addressList.get(providedNodeAddressIndex));
+        }
+    }
+
     @Scheduled(fixedDelay = 5000)
     public void updateNodeAddresses() {
         logger.info("Polling actual chord state");
-        List<NodeAddress> addressList = new ArrayList<>();
+        List<NodeAddress> chordAddresses = new ArrayList<>();
 
         if (addressSelf == null) {
             addressSelf = new NodeAddress(consulClient.getAgentSelf().getValue().getMember().getAddress());
@@ -105,16 +128,16 @@ public class BackupService {
 
         List<CatalogService> catalogServiceList = consulClient.getCatalogService(applicationName, QueryParams.DEFAULT).getValue();
 
-        addressList.addAll(catalogServiceList.stream().map(service ->
-//                TODO mozno treba service.getAddress zamenit za "localhost" ked spustas na local
-                new NodeAddress(service.getAddress(), service.getServicePort())
+        chordAddresses.addAll(catalogServiceList.stream().map(service ->
+//      TODO mozno treba service.getAddress vymenit na "localhost" ked spustas na local
+                        new NodeAddress(service.getAddress(), service.getServicePort())
         ).collect(Collectors.toList()));
 
         if (this.addressList == null || this.addressList.isEmpty()) {
-            this.addressList = addressList;
+            this.addressList = chordAddresses;
             updateAddressRanges();
-        } else if (!addressList.equals(this.addressList)) {
-            backupData(addressList);
+        } else if (!chordAddresses.equals(this.addressList)) {
+            backupData(chordAddresses);
         }
     }
 
