@@ -36,7 +36,7 @@ public class ApiController {
     private static final Logger logger = LoggerFactory.getLogger(ApiController.class);
 
     public static final String READ_ALL = "/readAll";
-    public static final String READ = "/readAll";
+    public static final String READ = "/read";
     public static final String SAVE = "/save";
     public static final String TRANSPORT_DATA = "/transportData";
 
@@ -159,6 +159,7 @@ public class ApiController {
 
     @Scheduled(fixedDelay = 5000)
     public void updateNodeAddresses() {
+        logger.info("Polling actual chord state");
         backupService.updateNodeAddresses();
     }
 }

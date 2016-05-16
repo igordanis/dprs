@@ -36,7 +36,7 @@ public class VectorClock {
         return thisValue.compareTo(otherValue);
     }
 
-    private void setValueForComponent(final Integer component, final Integer newValue) {
+    public void setValueForComponent(final Integer component, final Integer newValue) {
         vectorClock.computeIfPresent(component, (key, oldValue) -> newValue);
         vectorClock.computeIfAbsent(component, key -> newValue);
     }
