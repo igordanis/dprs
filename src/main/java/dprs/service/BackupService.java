@@ -269,13 +269,14 @@ public class BackupService {
 
     public int getCurrentBackup(String key) {
         int keyAddress = addressList.indexOf(getAddressByHash(key.hashCode()));
-        int myAddress;
+        int myAddress = 0;
 
         for (NodeAddress address : addressList) {
-
+            if (address.getAddress().equals(addressSelf.getAddress()) && address.getPort() == addressSelf.getPort()) {
+                myAddress = addressList.indexOf(address);
+            }
         }
-        logger.info("Key address: " + keyAddress);
-        logger.info("My address: " + myAddress);
+
         if (myAddress < keyAddress) {
             myAddress += addressList.size();
         }
