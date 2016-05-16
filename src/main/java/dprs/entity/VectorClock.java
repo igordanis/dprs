@@ -47,7 +47,11 @@ public class VectorClock {
     }
 
     public static VectorClock fromJSON(String json) {
-        return new Gson().fromJson(json, VectorClock.class);
+        if (json == null) {
+            return new VectorClock();
+        } else {
+            return new Gson().fromJson(json, VectorClock.class);
+        }
     }
 
 }

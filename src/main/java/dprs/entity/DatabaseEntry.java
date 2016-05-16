@@ -29,7 +29,7 @@ public class DatabaseEntry {
         this.value = value;
     }
 
-    public Object getVectorClock() {
+    public VectorClock getVectorClock() {
         return vectorClock;
     }
 

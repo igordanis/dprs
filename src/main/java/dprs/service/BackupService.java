@@ -246,4 +246,8 @@ public class BackupService {
         }
         return myAddress - keyAddress > 0 ? writeQuorum + keyAddress - myAddress : writeQuorum;
     }
+
+    public int getAddressSelfIndex() {
+        return addressList.indexOf(addressSelf);
+    }
 }

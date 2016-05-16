@@ -37,6 +37,7 @@ public class WriteController {
     @RequestMapping(SAVE)
     public SaveResponse redirectSave(@RequestParam(value = "key") String key,
                                      @RequestParam(value = "value") int value,
+                                     @RequestParam(value = "vectorClock") String vectorClockJson,
                                      @RequestParam(value = "redirected", defaultValue = "false") boolean redirected) {
         NodeAddress address = backupService.getAddressByHash(key.hashCode());
 
@@ -44,35 +45,41 @@ public class WriteController {
             if (address == null) {
                 return new SaveResponse(new WriteException(""));
             } else {
-                // TODO update params vectorClock functionality
                 URI uri = UriComponentsBuilder.fromUriString("http://" + address.getAddress() + ":8080").path(SAVE)
                         .queryParam("key", key)
                         .queryParam("value", value)
+                        .queryParam("vectorClock", vectorClockJson)
                         .build().toUri();
                 logger.info("Redirecting to " + uri.toString());
                 return new RestTemplate().getForObject(uri, SaveResponse.class);
             }
         } else {
-            return saveValue(key, value);
+            return saveValue(key, value, vectorClockJson);
         }
 
     }
 
-    private SaveResponse saveValue(String key, int value) {
+    private SaveResponse saveValue(String key, int value, String vectorClockJson) {
         logger.info("Saving " + key + ":" + value);
-
-        int currentBackup = backupService.getCurrentBackup(key);
-        logger.info("Current backup: " + currentBackup);
-        int quorum = 1;
         InMemoryDatabase database = InMemoryDatabase.INSTANCE;
 
-        DatabaseEntry entry = new DatabaseEntry(value, new VectorClock(), writeQuorum, currentBackup);
+        int currentBackup = backupService.getCurrentBackup(key);
+        int quorum = 1;
+
+        VectorClock vectorClock = VectorClock.fromJSON(vectorClockJson);
+        int index = backupService.getAddressSelfIndex();
+        if (database.get(key) != null && !vectorClock.isThisNewerThan(database.get(key).getVectorClock(), index)) {
+            return new SaveResponse(new WriteException("A new version already exists."));
+        }
+
+        DatabaseEntry entry = new DatabaseEntry(value, vectorClock, writeQuorum, currentBackup);
         database.put(key, entry);
 
         if (backupService.getAddressSelf().equals(backupService.getAddressByHash(key.hashCode()))) {
             HashMap<String, Object> params = new HashMap<>();
             params.put("key", key);
             params.put("value", value);
+            params.put("vectorClock", vectorClock.toJSON());
             params.put("redirected", true);
 
             for (int i = 1; i < writeQuorum; i++) {
