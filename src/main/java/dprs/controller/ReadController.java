@@ -64,12 +64,12 @@ public class ReadController {
         InMemoryDatabase database = InMemoryDatabase.INSTANCE;
         readQuorum = readQuorum != null ? readQuorum : this.readQuorum;
 
-        Set<DatabaseEntry> values = new HashSet<>();
+        Set<Object> values = new HashSet<>();
         int quorum = 0;
 
         if (database.containsKey(key)) {
             quorum++;
-            values.add(database.get(key));
+            values.add(database.get(key).getValue());
         }
 
         if (!redirected) {
@@ -92,22 +92,7 @@ public class ReadController {
             }
         }
 
-
-        List<DatabaseEntry> responseValues = new ArrayList<>();
-        for (DatabaseEntry entry : values) {
-            boolean inResponse = false;
-            for (DatabaseEntry databaseEntry : responseValues) {
-                if (databaseEntry.getValue() == entry.getValue()) {
-                    inResponse = true;
-                    break;
-                }
-            }
-            if (!inResponse) {
-                responseValues.add(entry);
-            }
-        }
-
-        return new ReadResponse(responseValues, quorum >= readQuorum);
+        return new ReadResponse(values, quorum >= readQuorum);
     }
 
 }

@@ -8,10 +8,10 @@ import java.util.List;
 
 
 public class ReadResponse extends ResponseWithException {
-    private Collection<DatabaseEntry> values;
+    private Collection<Object> values;
     private boolean successful;
 
-    public ReadResponse(Collection<DatabaseEntry> values, boolean successful) {
+    public ReadResponse(Collection<Object> values, boolean successful) {
         this.values = values;
         this.successful = successful;
     }
@@ -26,7 +26,7 @@ public class ReadResponse extends ResponseWithException {
         successful = false;
     }
 
-    public Collection<DatabaseEntry> getValues() {
+    public Collection<Object> getValues() {
         return values;
     }
 }

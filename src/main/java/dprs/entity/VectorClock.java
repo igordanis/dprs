@@ -2,12 +2,13 @@ package dprs.entity;
 
 import com.google.gson.Gson;
 
+import java.io.Serializable;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 
-public class VectorClock {
+public class VectorClock implements Serializable {
     private Map<Integer, Integer> vectorClock = new HashMap();
 
     public void incrementValueForComponent(final Integer component) {
