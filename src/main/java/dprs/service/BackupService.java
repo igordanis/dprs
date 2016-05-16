@@ -2,9 +2,6 @@ package dprs.service;
 
 import com.ecwid.consul.v1.ConsulClient;
 import com.ecwid.consul.v1.QueryParams;
-import com.ecwid.consul.v1.agent.model.Member;
-import com.ecwid.consul.v1.catalog.model.CatalogService;
-import com.ecwid.consul.v1.health.model.HealthService;
 import com.google.gson.Gson;
 import dprs.components.InMemoryDatabase;
 import dprs.controller.TransportController;
@@ -70,7 +67,7 @@ public class BackupService {
         params.put("data", new Gson().toJson(data));
         NodeAddress address = getAddressByOffset(offset);
         if (address != null) {
-            return sendData(getAddressByOffset(offset), TransportController.TRANSPORT_DATA, params);
+            return sendData(getAddressByOffset(offset).getAddress(), TransportController.TRANSPORT_DATA, params);
         } else {
             logger.error("Address was null. " + "Offset: " + offset);
             return null;

@@ -2,13 +2,14 @@ package dprs.response;
 
 import dprs.exceptions.ReadException;
 import java.util.ArrayList;
+import java.util.List;
 
 
 public class ReadResponse extends ResponseWithException {
-    ArrayList values;
-    boolean successful;
+    private List values;
+    private boolean successful;
     
-    public ReadResponse(ArrayList values, boolean successful) {
+    public ReadResponse(List values, boolean successful) {
         this.values = values;
         this.successful = successful;
     }
@@ -23,16 +24,8 @@ public class ReadResponse extends ResponseWithException {
         successful = false;
     }
     
-    public ArrayList getValues() {
+    public List getValues() {
         return values;
     }
-    
-    public boolean isSuccessful() {
-        return successful;
-    }
 
-    public void setValues(ArrayList values, boolean successful) {
-        this.values = values;
-        this.successful = successful;
-    }
 }

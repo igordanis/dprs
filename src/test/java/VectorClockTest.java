@@ -1,7 +1,8 @@
-package dprs.entity;
+
 
 import org.junit.Before;
 import org.junit.Test;
+import dprs.entity.VectorClock;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -59,5 +60,26 @@ public class VectorClockTest {
         assertFalse(deserializedClock.isThisNewerThan(vk,0));
     }
 
-
+     @Test
+    public void testIncrement() throws Exception { 
+        VectorClock vk = new VectorClock();
+        VectorClock oldVk = new VectorClock();
+        vk.setValueForComponent(0, 2);
+        vk.setValueForComponent(1, 4);
+        vk.setValueForComponent(2, 1);
+        vk.incrementValueForComponent(1);
+        vk.incrementValueForComponent(0);
+        vk.incrementValueForComponent(2);
+        
+        oldVk.setValueForComponent(0, 2);
+        oldVk.setValueForComponent(1, 4);
+        oldVk.setValueForComponent(2, 3);
+        oldVk.incrementValueForComponent(1);
+        oldVk.incrementValueForComponent(0);
+        oldVk.incrementValueForComponent(2);
+        
+        assertFalse(oldVk.isThisNewerThan(vk,1));
+        assertFalse(oldVk.isThisNewerThan(vk,0));
+        assertTrue(oldVk.isThisNewerThan(vk,2));
+    }
 }
