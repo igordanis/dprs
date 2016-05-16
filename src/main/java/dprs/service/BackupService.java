@@ -17,17 +17,16 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.toList;
 
 @Service
 public class BackupService {
     private static final Logger logger = LoggerFactory.getLogger(BackupService.class);
 
-    private NodeAddress addressSelf = null;
+    private NodeAddress selfAddress = null;
     private List<NodeAddress> addressList = null;
     private List<int[]> addressRangeList = null;
 
@@ -39,9 +38,10 @@ public class BackupService {
     int writeQuorum;
 
     public Object sendData(String address, String path, Map<String, Object> params) {
-        logger.info("Sending data from " + addressSelf.getAddress() + " to " + address);
+        logger.info("Sending data from " + selfAddress.getAddress() + " to " + address);
 
-        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString("http://" + address + ":8080").path(path);
+        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString("http://" + address +
+                ":8080").path(path);
 
         for (String key : params.keySet()) {
             builder.queryParam(key, params.get(key));
@@ -65,7 +65,8 @@ public class BackupService {
         params.put("data", new Gson().toJson(data));
         NodeAddress address = getAddressByOffset(offset);
         if (address != null) {
-            return sendData(getAddressByOffset(offset).getAddress(), TransportController.TRANSPORT_DATA, params);
+            return sendData(getAddressByOffset(offset).getAddress(), TransportController
+                    .TRANSPORT_DATA, params);
         } else {
             logger.error("Address was null. " + "Offset: " + offset);
             return null;
@@ -75,7 +76,7 @@ public class BackupService {
     public NodeAddress getAddressByOffset(int offset) {
         int index = -1;
         for (int i = 0; i < addressList.size(); i++) {
-            if (addressList.get(i).getAddress().equals(addressSelf.getAddress())) {
+            if (addressList.get(i).getAddress().equals(selfAddress.getAddress())) {
                 index = i;
                 break;
             }
@@ -92,27 +93,59 @@ public class BackupService {
         }
     }
 
-    @Scheduled(fixedDelay = 5000)
-    public void updateNodeAddresses() {
-        logger.info("Polling actual chord state");
-        List<NodeAddress> addressList = new ArrayList<>();
+    public Optional<NodeAddress> getAddressByOffset(NodeAddress nodeAddress, int offset) {
 
-        if (addressSelf == null) {
-            addressSelf = new NodeAddress(consulClient.getAgentSelf().getValue().getMember().getAddress());
+        final Optional<NodeAddress> first = addressList.stream()
+                .filter(anyChordAddress -> anyChordAddress.getAddress()
+                        .equals(nodeAddress.getAddress()))
+                .findFirst();
+
+        int providedNodeAddressIndex = addressList.indexOf(first.get());
+
+        if (offset > addressList.size()
+                || offset < -addressList.size()
+                || providedNodeAddressIndex == -1) {
+            return Optional.empty();
+        } else {
+            providedNodeAddressIndex =
+                    (providedNodeAddressIndex + offset) % addressList.size();
+
+            while (providedNodeAddressIndex < 0) {
+                providedNodeAddressIndex += addressList.size();
+            }
+
+            return Optional.of(addressList.get(providedNodeAddressIndex));
+        }
+    }
+
+
+    @Scheduled(fixedDelay = 5000)
+    public void pollNodeAddresses() {
+        logger.info("Polling actual chord state");
+        List<NodeAddress> chordAddresses = new ArrayList<>();
+
+        if (selfAddress == null) {
+            selfAddress = new NodeAddress(consulClient.getAgentSelf().getValue().getMember()
+                    .getAddress());
         }
 
-        addressList.addAll(
-                consulClient.getHealthServices(applicationName, true, QueryParams.DEFAULT).getValue()
-                        .stream().map(service ->
-                        new NodeAddress(service.getNode().getAddress())
-                ).sorted().collect(Collectors.toList())
-        );
+        final List<NodeAddress> addressesInChord = consulClient
+                .getHealthServices(applicationName, true, QueryParams.DEFAULT)
+                .getValue()
+                .stream()
+                .map(service -> new NodeAddress(service.getNode().getAddress()))
+                .sorted()
+                .collect(toList());
+
+        chordAddresses.addAll(addressesInChord);
+
+        chordAddresses.addAll(addressesInChord);
 
         if (this.addressList == null || this.addressList.isEmpty()) {
-            this.addressList = addressList;
+            this.addressList = chordAddresses;
             updateAddressRanges();
-        } else if (!addressList.equals(this.addressList)) {
-            backupData(addressList);
+        } else if (!chordAddresses.equals(this.addressList)) {
+            backupData(chordAddresses);
         }
     }
 
@@ -134,12 +167,11 @@ public class BackupService {
             }
             addressRangeList.add(i, range);
         }
-
         return addressRangeList;
     }
 
     private void backupData(List<NodeAddress> updatedAddressList) {
-        logger.info(addressSelf.getAddress() + ": Calling backup data.. " + addressList);
+        logger.info(selfAddress.getAddress() + ": Calling backup data.. " + addressList);
         NodeAddress previousNode = getAddressByOffset(-1);
         NodeAddress nextNode = getAddressByOffset(1);
         addressList = updatedAddressList;
@@ -147,7 +179,7 @@ public class BackupService {
 
         // handle failure of next node
         if (nextNode != null && !addressList.contains(nextNode)) {
-            logger.info(addressSelf.getAddress() + ": Next node failed");
+            logger.info(selfAddress.getAddress() + ": Next node failed");
             Map<Object, DatabaseEntry> data = databaseDeepCopy();
 
             // update currentBackups for following nodes
@@ -162,7 +194,7 @@ public class BackupService {
 
         // handle failure of previous node
         if (previousNode != null && !addressList.contains(previousNode)) {
-            logger.info(addressSelf.getAddress() + ": Previous node failed!");
+            logger.info(selfAddress.getAddress() + ": Previous node failed!");
             Map<Object, DatabaseEntry> data = databaseDeepCopy();
 
             // send all values that were stored on failed node to previous node (only first copies)
@@ -175,14 +207,16 @@ public class BackupService {
 
         // handle new next node
         if (nextNode != null && !nextNode.equals(getAddressByOffset(1))) {
-            logger.info(addressSelf.getAddress() + ": New next node!");
+            logger.info(selfAddress.getAddress() + ": New next node!");
             Map<Object, DatabaseEntry> data = databaseDeepCopy();
             NodeAddress newNextNode = getAddressByOffset(1);
 
             // collect part of data that should be transported to new node
             Map<Object, DatabaseEntry> dataForNextNode = data.entrySet().stream().filter(value ->
-                    getAddressByHash(value.getKey().hashCode()).getAddress().equals(newNextNode.getAddress())
-                            && value.getValue().getCurrentBackup() == value.getValue().getMaxBackups()
+                    getAddressByHash(value.getKey().hashCode()).getAddress().equals(newNextNode
+                            .getAddress())
+                            && value.getValue().getCurrentBackup() == value.getValue()
+                            .getMaxBackups()
             ).collect(Collectors.toMap(p -> p.getKey(), p -> p.getValue()));
             transportData(1, dataForNextNode);
 
@@ -208,7 +242,9 @@ public class BackupService {
         return deepCopy;
     }
 
-    private Map<Object, DatabaseEntry> increaseAllCurrentBackupValues(Map<Object, DatabaseEntry> data, int addedValue) {
+    private Map<Object, DatabaseEntry> increaseAllCurrentBackupValues(Map<Object, DatabaseEntry>
+                                                                              data, int
+                                                                              addedValue) {
         for (Object key : data.keySet()) {
             DatabaseEntry value = data.get(key);
             value.setCurrentBackup(value.getCurrentBackup() + addedValue);
@@ -235,7 +271,7 @@ public class BackupService {
     }
 
     public NodeAddress getSelfAddresss() {
-        return addressSelf;
+        return selfAddress;
     }
 
     public int getCurrentBackup(String key) {
