@@ -11,6 +11,8 @@ public class ReadResponse extends ResponseWithException {
     private Collection<Object> values;
     private boolean successful;
 
+    public ReadResponse() {}
+
     public ReadResponse(Collection<Object> values, boolean successful) {
         this.values = values;
         this.successful = successful;
