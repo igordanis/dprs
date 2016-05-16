@@ -38,14 +38,14 @@ public class ReadController {
     @RequestMapping(READ)
     public ReadResponse read(
             @RequestParam(value = "key") String key,
-            @RequestParam(value = "readQuorum", required = true) Integer readQuorum,
+            @RequestParam(value = "readQuorum", required = false) Integer readQuorum,
             @RequestParam(value = "redirected", defaultValue = "false") boolean redirected
     ) {
-        String transactionId = randomUUID().toString();
         NodeAddress address = backupService.getAddressByHash(key.hashCode());
 
         if (!redirected && address != null && !address.getAddress().equals(backupService.getSelfAddresss().getAddress())) {
             if (address == null) {
+                logger.info("Cannot find address for key " + key);
                 return new ReadResponse(new ReadException("Cannot find address for key"));
             } else {
                 URI uri = UriComponentsBuilder.fromUriString("http://" + address.getAddress() + ":8080").path(READ)
@@ -76,21 +76,26 @@ public class ReadController {
             HashMap<String, Object> params = new HashMap<>();
             params.put("key", key);
             params.put("redirected", true);
+            params.put("readQuorum", readQuorum);
 
             for (int i = 1; i < readQuorum; i++) {
 
                 NodeAddress address = backupService.getAddressByOffset(i);
                 if (address != null) {
                     try {
-                        ReadResponse response = (ReadResponse) backupService.sendData(address, READ, params);
-                        values.addAll(response.getValues());
+                        Object response = backupService.sendData(address, READ, params);
+                        logger.info("Received response " + response);
+                        LinkedHashMap<String, Object> readResponse = (LinkedHashMap<String, Object>) response;
+                        List<Object> receivedValues = (List<Object>)readResponse.get("values");
+                        values.addAll(receivedValues);
                     } catch (Exception e) {
-                        logger.error("Failed to send read data to " + address);
+                        logger.error("Failed to send read data to " + address, e);
                     }
                 }
             }
         }
 
+        logger.info("Returning " + values);
         return new ReadResponse(values, quorum >= readQuorum);
     }
 
