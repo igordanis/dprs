@@ -2,6 +2,7 @@ package dprs.service;
 
 import com.ecwid.consul.v1.ConsulClient;
 import com.ecwid.consul.v1.QueryParams;
+import com.ecwid.consul.v1.agent.model.Member;
 import com.ecwid.consul.v1.catalog.model.CatalogService;
 import com.google.gson.Gson;
 import dprs.components.InMemoryDatabase;
@@ -51,7 +52,8 @@ public class BackupService {
         try {
             return new RestTemplate().getForObject(targetUrl, Object.class);
         } catch (Exception e) {
-            logger.error("Failed to send data to " + address, e);
+            logger.error("Failed to send data to " + address.getAddress() + ":" + address.getPort(), e);
+
             return null;
         }
     }
@@ -119,11 +121,12 @@ public class BackupService {
 
     @Scheduled(fixedDelay = 5000)
     public void updateNodeAddresses() {
-        logger.info("Polling actual chord state");
         List<NodeAddress> chordAddresses = new ArrayList<>();
 
         if (addressSelf == null) {
-            addressSelf = new NodeAddress(consulClient.getAgentSelf().getValue().getMember().getAddress());
+            Member consulMember = consulClient.getAgentSelf().getValue().getMember();
+//            addressSelf = new NodeAddress("localhost",consulMember.getPort());
+            addressSelf = new NodeAddress(consulMember.getAddress(), consulMember.getPort());
         }
 
         List<CatalogService> catalogServiceList = consulClient.getCatalogService(applicationName, QueryParams.DEFAULT).getValue();
@@ -131,6 +134,7 @@ public class BackupService {
         chordAddresses.addAll(catalogServiceList.stream().map(service ->
 //      TODO mozno treba service.getAddress vymenit na "localhost" ked spustas na local
                         new NodeAddress(service.getAddress(), service.getServicePort())
+//                        new NodeAddress("localhost", service.getServicePort())
         ).collect(Collectors.toList()));
 
         if (this.addressList == null || this.addressList.isEmpty()) {
@@ -265,7 +269,13 @@ public class BackupService {
 
     public int getCurrentBackup(String key) {
         int keyAddress = addressList.indexOf(getAddressByHash(key.hashCode()));
-        int myAddress = addressList.indexOf(getSelfAddresss());
+        int myAddress;
+
+        for (NodeAddress address : addressList) {
+
+        }
+        logger.info("Key address: " + keyAddress);
+        logger.info("My address: " + myAddress);
         if (myAddress < keyAddress) {
             myAddress += addressList.size();
         }

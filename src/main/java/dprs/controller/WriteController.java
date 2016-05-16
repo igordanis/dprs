@@ -38,14 +38,14 @@ public class WriteController {
     public SaveResponse redirectSave(@RequestParam(value = "key") String key,
                                      @RequestParam(value = "value") int value,
                                      @RequestParam(value = "vectorClock", required = false) String vectorClockJson,
-                                     @RequestParam(value = "redirected", defaultValue = "false") boolean redirected) {
+                                     @RequestParam(value = "redirected", defaultValue = "false") boolean redirected) throws WriteException {
         NodeAddress address = backupService.getAddressByHash(key.hashCode());
 
         if (!redirected && address != null && !address.getAddress().equals(backupService.getSelfAddresss().getAddress())) {
             if (address == null) {
-                return new SaveResponse(new WriteException("Unknown target node for key."));
+                throw new WriteException("Unknown target node for key.");
             } else {
-                URI uri = UriComponentsBuilder.fromUriString("http://" + address.getAddress() + ":8080").path(SAVE)
+                URI uri = UriComponentsBuilder.fromUriString("http://" + address.getAddress() + ":" + address.getPort()).path(SAVE)
                         .queryParam("key", key)
                         .queryParam("value", value)
                         .queryParam("vectorClock", vectorClockJson)
@@ -54,30 +54,37 @@ public class WriteController {
                 return new RestTemplate().getForObject(uri, SaveResponse.class);
             }
         } else {
-            return saveValue(key, value, vectorClockJson);
+            return saveValue(key, value, vectorClockJson, redirected);
         }
 
     }
 
-    private SaveResponse saveValue(String key, int value, String vectorClockJson) {
+    private SaveResponse saveValue(String key, int value, String vectorClockJson, boolean redirected) throws WriteException {
         logger.info("Saving " + key + ":" + value);
         InMemoryDatabase database = InMemoryDatabase.INSTANCE;
 
         int currentBackup = backupService.getCurrentBackup(key);
-        int quorum = 1;
+        int quorum = 0;
 
         VectorClock vectorClock = VectorClock.fromJSON(vectorClockJson);
-        int index = backupService.getAddressSelfIndex();
-        vectorClock.incrementValueForComponent(index);
-
-        if (database.get(key) != null && !vectorClock.isThisNewerThan(database.get(key).getVectorClock(), index)) {
-            return new SaveResponse(new WriteException("A newer version already exists: " + database.get(key).getVectorClock().toJSON()));
+        if (vectorClock == null) {
+            vectorClock = VectorClock.fromAddressList(backupService.getAllAddresses());
         }
 
+        int index = backupService.getAddressSelfIndex();
+        vectorClock.incrementValueForComponent(index);
         DatabaseEntry entry = new DatabaseEntry(value, vectorClock, writeQuorum, currentBackup);
-        database.put(key, entry);
 
-        if (backupService.getSelfAddresss().equals(backupService.getAddressByHash(key.hashCode()))) {
+        if (database.get(key) != null && !vectorClock.isThisNewerThan(database.get(key).getVectorClock(), index)) {
+            if (!backupService.getSelfAddresss().equals(backupService.getAddressByHash(key.hashCode()))) {
+                throw new WriteException("A newer version already exists: " + database.get(key));
+            }
+        } else {
+            quorum++;
+            database.put(key, entry);
+        }
+
+        if (!redirected) {
             HashMap<String, Object> params = new HashMap<>();
             params.put("key", key);
             params.put("value", value);
@@ -87,9 +94,12 @@ public class WriteController {
             for (int i = 1; i < writeQuorum; i++) {
 
                 NodeAddress address = backupService.getAddressByOffset(i);
-                if (address != null) {
-                    if (backupService.sendData(address, SAVE, params) != null) {
+                if (address != null && !address.equals(backupService.getSelfAddresss())) {
+                    try {
+                        backupService.sendData(address, SAVE, params);
                         quorum++;
+                    } catch (Exception e) {
+                        logger.error("Failed to send write data to " + address);
                     }
                 }
             }

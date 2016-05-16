@@ -31,7 +31,7 @@ public class NodeAddress implements Comparable<NodeAddress> {
     }
 
     public Integer getHash() {
-        return new StringBuilder(address).reverse().toString().hashCode();
+        return new StringBuilder(address + port).reverse().toString().hashCode();
     }
 
     @Override
@@ -41,7 +41,11 @@ public class NodeAddress implements Comparable<NodeAddress> {
 
     @Override
     public boolean equals(Object nodeAddress) {
-        return nodeAddress == null || address.equals(((NodeAddress) nodeAddress).getAddress());
+        if (nodeAddress == null) {
+            return false;
+        }
+        NodeAddress targetAddress = (NodeAddress) nodeAddress;
+        return address.equals(targetAddress.address) && port == targetAddress.port;
     }
 
     @Override

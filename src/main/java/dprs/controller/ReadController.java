@@ -3,29 +3,22 @@ package dprs.controller;
 import dprs.components.InMemoryDatabase;
 import dprs.entity.DatabaseEntry;
 import dprs.entity.NodeAddress;
-import dprs.entity.VectorClock;
-import dprs.response.DynamoReadResponse;
-import dprs.response.ReadAllResponse;
+import dprs.exceptions.ReadException;
 import dprs.response.ReadResponse;
-import dprs.response.SaveResponse;
 import dprs.service.BackupService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.propertyeditors.StringArrayPropertyEditor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
-import org.w3c.dom.Node;
 
 import java.net.URI;
 import java.util.*;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 import static java.util.UUID.randomUUID;
 
@@ -39,77 +32,82 @@ public class ReadController {
 
     @Autowired
     BackupService backupService;
+    @Value("${quorum.read}")
+    int readQuorum;
 
-
-    @RequestMapping(ReadController.READ)
+    @RequestMapping(READ)
     public ReadResponse read(
             @RequestParam(value = "key") String key,
             @RequestParam(value = "readQuorum", required = true) Integer readQuorum,
-            @RequestParam(value = "vectorClock", required = false) VectorClock vectorClock
+            @RequestParam(value = "redirected", defaultValue = "false") boolean redirected
     ) {
         String transactionId = randomUUID().toString();
+        NodeAddress address = backupService.getAddressByHash(key.hashCode());
 
-        /*
-         * Find part of chord which manages given key
-         */
-        Set<NodeAddress> set = new HashSet<NodeAddress>();
-        NodeAddress firstDestinationAdress = this.backupService.getAddressByHash(key.hashCode());
-
-        List<Optional<NodeAddress>> destinationAddresses = IntStream.rangeClosed(0, readQuorum)
-                .mapToObj(i -> this.backupService.getAddressByOffset(firstDestinationAdress, i))
-                .collect(Collectors.toList());
-
-        /*
-         * Ziska read odpovede od vsetkych dynamo uzlov ktore maju obsahovat dany objekt
-         */
-        Set<DynamoReadResponse> allResponses = destinationAddresses.stream()
-                .map(destinationAddress -> {
-                    URI destinationUri = UriComponentsBuilder
-                            .fromUriString("http://" + destinationAddress + ":8080")
-                            .path(ReadController.DYNAMO_READ)
-                            .queryParam("key", key)
-                            .queryParam("readQuorum", readQuorum)
-                            .queryParam("transactionId", vectorClock)
-                            .build()
-                            .toUri();
-
-                    ReadController.logger.info(transactionId, "Forwarding read request to: "
-                            + destinationUri);
-
-                    return new RestTemplate()
-                            .getForObject(destinationUri, DynamoReadResponse.class);
-
-                })
-                .collect(Collectors.toSet());
-
-        HashMap<VectorClock, DynamoReadResponse> uniqueValuesByVectorClock = new HashMap();
-        allResponses.stream()
-                .forEach(resp -> uniqueValuesByVectorClock.put(resp.getVectorClock(), resp));
-
-        List<Object> uniqValues = uniqueValuesByVectorClock.values().stream()
-                .map(uniqueResponse -> uniqueResponse.getValue())
-                .collect(Collectors.toList());
-
-        return new ReadResponse(uniqValues, true);
+        if (!redirected && address != null && !address.getAddress().equals(backupService.getSelfAddresss().getAddress())) {
+            if (address == null) {
+                return new ReadResponse(new ReadException("Cannot find address for key"));
+            } else {
+                URI uri = UriComponentsBuilder.fromUriString("http://" + address.getAddress() + ":8080").path(READ)
+                        .queryParam("key", key)
+                        .queryParam("readQuorum", readQuorum)
+                        .build().toUri();
+                logger.info("Redirecting to " + uri.toString());
+                return new RestTemplate().getForObject(uri, ReadResponse.class);
+            }
+        } else {
+            return readValue(key, readQuorum, redirected);
+        }
     }
 
+    private ReadResponse readValue(String key, Integer readQuorum, boolean redirected) {
+        InMemoryDatabase database = InMemoryDatabase.INSTANCE;
+        readQuorum = readQuorum != null ? readQuorum : this.readQuorum;
+
+        Set<DatabaseEntry> values = new HashSet<>();
+        int quorum = 0;
+
+        if (database.containsKey(key)) {
+            quorum++;
+            values.add(database.get(key));
+        }
+
+        if (!redirected) {
+            HashMap<String, Object> params = new HashMap<>();
+            params.put("key", key);
+            params.put("value", readQuorum);
+            params.put("redirected", true);
+
+            for (int i = 1; i < readQuorum; i++) {
+
+                NodeAddress address = backupService.getAddressByOffset(i);
+                if (address != null) {
+                    try {
+                        ReadResponse response = (ReadResponse) backupService.sendData(address, READ, params);
+                        values.addAll(response.getValues());
+                    } catch (Exception e) {
+                        logger.error("Failed to send read data to " + address);
+                    }
+                }
+            }
+        }
 
 
+        List<DatabaseEntry> responseValues = new ArrayList<>();
+        for (DatabaseEntry entry : values) {
+            boolean inResponse = false;
+            for (DatabaseEntry databaseEntry : responseValues) {
+                if (databaseEntry.getValue() == entry.getValue()) {
+                    inResponse = true;
+                    break;
+                }
+            }
+            if (!inResponse) {
+                responseValues.add(entry);
+            }
+        }
 
-    @RequestMapping(ReadController.DYNAMO_READ)
-    public DynamoReadResponse dynamoRead(
-            @RequestParam(value = "key") String key,
-            @RequestParam(value = "readQuorum", required = true) Integer readQuorum,
-            @RequestParam(value = "vectorClock", required = true) VectorClock vectorClock,
-            @RequestParam(value = "transactionId", required = true) String transactionId
-    ) {
-        final DatabaseEntry databaseEntry = InMemoryDatabase.INSTANCE.get(key);
-        final DynamoReadResponse dynamoReadResponse = new DynamoReadResponse();
-        dynamoReadResponse.setKey(key);
-        dynamoReadResponse.setValue(databaseEntry.getValue());
-        dynamoReadResponse.setVectorClock(databaseEntry.getVectorClock());
-
-        return dynamoReadResponse;
+        return new ReadResponse(responseValues, quorum >= readQuorum);
     }
 
 }

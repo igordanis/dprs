@@ -1,31 +1,32 @@
 package dprs.response;
 
+import dprs.entity.DatabaseEntry;
 import dprs.exceptions.ReadException;
-import java.util.ArrayList;
+
+import java.util.Collection;
 import java.util.List;
 
 
 public class ReadResponse extends ResponseWithException {
-    private List values;
+    private Collection<DatabaseEntry> values;
     private boolean successful;
-    
-    public ReadResponse(List values, boolean successful) {
+
+    public ReadResponse(Collection<DatabaseEntry> values, boolean successful) {
         this.values = values;
         this.successful = successful;
     }
-    
+
     public ReadResponse(Exception exception) {
         super(exception);
         successful = false;
     }
 
     public ReadResponse(ReadException readException) {
-        //super(exception);
+        super(readException);
         successful = false;
     }
-    
-    public List getValues() {
+
+    public Collection<DatabaseEntry> getValues() {
         return values;
     }
-
 }

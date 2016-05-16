@@ -3,6 +3,7 @@ package dprs.entity;
 import com.google.gson.Gson;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 
@@ -48,10 +49,23 @@ public class VectorClock {
 
     public static VectorClock fromJSON(String json) {
         if (json == null) {
-            return new VectorClock();
+            return null;
         } else {
             return new Gson().fromJson(json, VectorClock.class);
         }
     }
 
+    public static VectorClock fromAddressList(List<NodeAddress> addressList) {
+        VectorClock vectorClock = new VectorClock();
+        vectorClock.vectorClock = new HashMap<>();
+        for (NodeAddress address : addressList) {
+            vectorClock.vectorClock.put(address.hashCode(), 0);
+        }
+        return vectorClock;
+    }
+
+    @Override
+    public String toString() {
+        return "vectorClock=" + vectorClock;
+    }
 }

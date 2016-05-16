@@ -45,7 +45,8 @@ public class UtilityController {
         if (!redirected) {
             for (NodeAddress address : backupService.getAllAddresses()) {
                 if (!address.equals(backupService.getSelfAddresss())) {
-                    URI uri = UriComponentsBuilder.fromUriString("http://" + address.getAddress() + ":8080")
+                    URI uri = UriComponentsBuilder
+                            .fromUriString("http://" + address.getAddress() + ":" + address.getPort())
                             .path(CLEAR_DATA)
                             .queryParam("redirected", true)
                             .build().toUri();
@@ -74,8 +75,11 @@ public class UtilityController {
         List<NodeAddress> addressList = backupService.getAllAddresses();
 
         for (NodeAddress address : addressList) {
-            URI uri = UriComponentsBuilder.fromUriString("http://" + address.getAddress() + ":8080").path(MY_DATA).build().toUri();
-            data.put(address.getAddress(), new RestTemplate().getForObject(uri, List.class));
+            URI uri = UriComponentsBuilder
+                    .fromUriString("http://" + address.getAddress() + ":" + address.getPort())
+                    .path(MY_DATA).build().toUri();
+            logger.info("URI: " + uri);
+            data.put(address.getAddress() + ":" + address.getPort(), new RestTemplate().getForObject(uri, List.class));
         }
 
         return new AllDataResponse(data);

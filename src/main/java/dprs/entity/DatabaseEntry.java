@@ -6,8 +6,7 @@ public class DatabaseEntry {
     Integer maxBackups;
     Integer currentBackup;
 
-    public DatabaseEntry(Integer value, VectorClock vectorClock,
-                         Integer maxBackups, Integer currentBackup) {
+    public DatabaseEntry(Integer value, VectorClock vectorClock, Integer maxBackups, Integer currentBackup) {
         this.value = value;
         this.vectorClock = vectorClock;
         this.maxBackups = maxBackups;
