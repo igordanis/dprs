@@ -1,15 +1,17 @@
-package dprs.response;
+package dprs.response.util;
+
+import dprs.util.Tuple;
 
 import java.util.List;
 
 
-public class ReadResponse{
+public class ReadAllFromSelfResponse {
     private List<Tuple> values;
 
 
-    public ReadResponse(){}
+    public ReadAllFromSelfResponse(){}
 
-    public ReadResponse(List<Tuple> values){
+    public ReadAllFromSelfResponse(List<Tuple> values){
         this.values = values;
     }
 

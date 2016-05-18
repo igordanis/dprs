@@ -16,7 +16,7 @@ import java.util.HashMap;
 public class TransportController {
     private static final Logger logger = LoggerFactory.getLogger(TransportController.class);
 
-    public static final String TRANSPORT_DATA = "/transportData";
+    public static final String TRANSPORT_DATA = "/bulkWrite";
 
     @RequestMapping(TRANSPORT_DATA)
     public TransportDataResponse transportData(@RequestParam(value = "data") String data) {

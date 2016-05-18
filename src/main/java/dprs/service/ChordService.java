@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
  * Created by igordanis on 16/05/16.
  */
 @Service
-public class Chord {
+public class ChordService {
 
     @Autowired
     ConsulClient consulClient;
@@ -28,7 +28,7 @@ public class Chord {
     @Value("${spring.application.name}")
     String applicationName;
 
-    private static final Logger logger = LoggerFactory.getLogger(Chord.class);
+    private static final Logger logger = LoggerFactory.getLogger(ChordService.class);
 
     Map<Integer, NodeAddress> chordAddresses = new HashMap<>();
 

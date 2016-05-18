@@ -1,4 +1,4 @@
-package dprs.response;
+package dprs.response.dynamo;
 
 import dprs.entity.VectorClock;
 import dprs.exceptions.ReadException;

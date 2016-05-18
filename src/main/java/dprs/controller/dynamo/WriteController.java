@@ -1,13 +1,16 @@
-package dprs.controller;
+package dprs.controller.dynamo;
 
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 import dprs.components.InMemoryDatabase;
 import dprs.entity.DatabaseEntry;
 import dprs.entity.NodeAddress;
 import dprs.entity.VectorClock;
-import dprs.response.DynamoWriteResponse;
-import dprs.response.WriteResponse;
+import dprs.response.dynamo.DynamoWriteResponse;
+import dprs.wthrash.WriteResponse;
 //import dprs.wthrash.BackupService;
-import dprs.service.Chord;
+import dprs.service.ChordService;
+import dprs.wthrash.TransportDataResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,10 +34,11 @@ public class WriteController {
     private static final Logger logger = LoggerFactory.getLogger(WriteController.class);
 
     public static final String WRITE = "/write";
-    public static final String DYNAMO_WRITE = "/dynamoWrite";
+    public static final String DYNAMO_SINGLE_WRITE = "/dynamoWrite";
+    public static final String DYNAMO_BULK_WRITE = "/bulkWrite";
 
     @Autowired
-    Chord chord;
+    ChordService chordService;
 
 //    BackupService backupService;
 
@@ -46,28 +50,17 @@ public class WriteController {
     public WriteResponse write(
             @RequestParam(value = "key") String key,
             @RequestParam(value = "value") String value,
-            @RequestParam(value = "vectorClock", required = false) String vk
+            @RequestParam(value = "vectorClock", required = false) String receivedVectorClock
     ) {
         String transactionId = randomUUID().toString();
-        VectorClock deserializedClock = VectorClock.fromJSON(vk);
-        final VectorClock oldVectorClock;
+        VectorClock deserializedClock = VectorClock.fromJSON(receivedVectorClock);
 
         /*
          * Find part of chord which manages given key
          */
-
-        List<NodeAddress> destinationAddresses = chord.findDestinationAdressesForKey(
+        List<NodeAddress> destinationAddresses = chordService.findDestinationAdressesForKey(
                 key, writeQuorum);
 
-
-        if (deserializedClock == null || deserializedClock.getNumberOfComponents() == 0) {
-            final VectorClock newVC = new VectorClock();
-            destinationAddresses.forEach(destinationAddress -> newVC.setValueForComponent
-                    (destinationAddress.getHash(), 0));
-            oldVectorClock = newVC;
-        } else {
-            oldVectorClock = deserializedClock;
-        }
 
 
         /*
@@ -80,11 +73,11 @@ public class WriteController {
                     URI destinationUri = UriComponentsBuilder
                             .fromUriString("http://" + destinationAddress.getIP() + ":" +
                                     destinationAddress.getPort())
-                            .path(DYNAMO_WRITE)
+                            .path(DYNAMO_SINGLE_WRITE)
                             .queryParam("key", key)
                             .queryParam("value", value)
                             .queryParam("transactionId", transactionId)
-                            .queryParam("vectorClock", oldVectorClock.toJSON())
+                            .queryParam("vectorClock", deserializedClock.toJSON())
                             .build()
                             .toUri();
 
@@ -97,18 +90,19 @@ public class WriteController {
                 })
                 .collect(Collectors.toSet());
 
-        VectorClock vl = new VectorClock();
-        for(DynamoWriteResponse dynamoWriteResponse : allResponses){
-            vl = VectorClock.mergeNewest(vl, VectorClock.fromJSON(dynamoWriteResponse
-                    .getVectorClock()));
-        }
 
-        return new WriteResponse(vl, key);
+        //ak obsahuje kolekcia konkurentne vectorclocky, je nutne vratit
+        //mnozinu najnovsich vectorclockov ktore su konkurentne
+        //inak je nutne vratit jeden najnovsi vectorclock
+        //TODO: implement
+
+
+        return new WriteResponse(null, key);
     }
 
 
-    @RequestMapping(WriteController.DYNAMO_WRITE)
-    public DynamoWriteResponse dynamoRead(
+    @RequestMapping(WriteController.DYNAMO_SINGLE_WRITE)
+    public DynamoWriteResponse dynamoSingleWrite(
             @RequestParam(value = "key") String key,
             @RequestParam(value = "value") String value,
             @RequestParam(value = "transactionId", required = true) String transactionId,
@@ -118,11 +112,11 @@ public class WriteController {
 
         final VectorClock vectorClock = VectorClock.fromJSON(vc);
 
-        final Integer selfIndexInChord = chord.getSelfIndexInChord();
+        final Integer selfIndexInChord = chordService.getSelfIndexInChord();
 
         InMemoryDatabase.INSTANCE.computeIfPresent(key, (k, oldVal) -> {
 
-            if (vectorClock.isThisEqualOrNewerThan(oldVal.getVectorClock(), selfIndexInChord)) {
+            if (vectorClock.isThisNewerThan(oldVal.getVectorClock(), selfIndexInChord)) {
                 logger.info("New value has been updated");
                 vectorClock.incrementValueForComponent(selfIndexInChord);
                 return new DatabaseEntry(value, vectorClock);
@@ -142,6 +136,18 @@ public class WriteController {
         return new DynamoWriteResponse(true, vectorClock.toJSON());
     }
 
-    ;
+    @RequestMapping(DYNAMO_BULK_WRITE)
+    public TransportDataResponse bulkWrite(@RequestParam(value = "data") String data) {
+
+        InMemoryDatabase database = InMemoryDatabase.INSTANCE;
+
+        HashMap<String, DatabaseEntry> dataMap = new Gson()
+                .fromJson(data, new TypeToken<HashMap<String, DatabaseEntry>>() {
+                }.getType());
+
+        logger.info("Received data: " + data);
+        database.putAll(dataMap);
+        return new TransportDataResponse(true);
+    }
 
 }

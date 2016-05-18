@@ -1,4 +1,4 @@
-package dprs.response;
+package dprs.wthrash;
 
 import dprs.entity.VectorClock;
 

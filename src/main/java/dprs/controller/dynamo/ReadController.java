@@ -1,13 +1,13 @@
-package dprs.controller;
+package dprs.controller.dynamo;
 
 import dprs.components.InMemoryDatabase;
 import dprs.entity.DatabaseEntry;
 import dprs.entity.NodeAddress;
 import dprs.entity.VectorClock;
-import dprs.response.DynamoReadResponse;
-import dprs.response.ReadResponse;
-import dprs.response.Tuple;
-import dprs.service.Chord;
+import dprs.response.dynamo.DynamoReadResponse;
+import dprs.response.util.ReadAllFromSelfResponse;
+import dprs.util.Tuple;
+import dprs.service.ChordService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,15 +30,15 @@ public class ReadController {
     private static final Logger logger = LoggerFactory.getLogger(ReadController.class);
 
     public static final String READ = "/read";
-    public static final String DYNAMO_READ = "/dynamoRead";
+    public static final String DYNAMO_READ = "/dynamoSingleWrite";
 
 
     @Autowired
-    Chord chord;
+    ChordService chordService;
 
 
     @RequestMapping(ReadController.READ)
-    public ReadResponse read(
+    public ReadAllFromSelfResponse read(
             @RequestParam(value = "key") String key,
             @RequestParam(value = "readQuorum", required = true) Integer readQuorum
     ) {
@@ -47,7 +47,7 @@ public class ReadController {
         /*
          * Find part of chord which manages given key
          */
-        List<NodeAddress> destinationAddresses = chord.findDestinationAdressesForKey(key, readQuorum);
+        List<NodeAddress> destinationAddresses = chordService.findDestinationAdressesForKey(key, readQuorum);
 
         /*
          * Ziska read odpovede od vsetkych dynamo uzlov ktore maju obsahovat dany objekt
@@ -89,7 +89,7 @@ public class ReadController {
                 })
                 .collect(Collectors.toList());
 
-        return new ReadResponse(uniqValues);
+        return new ReadAllFromSelfResponse(uniqValues);
     }
 
 

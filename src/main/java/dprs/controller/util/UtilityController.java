@@ -1,9 +1,12 @@
-package dprs.wthrash;
+package dprs.controller.util;
 
 import dprs.components.InMemoryDatabase;
 import dprs.entity.DatabaseEntry;
 import dprs.entity.NodeAddress;
-import dprs.response.ReadAllResponse;
+import dprs.response.util.ReadAllFromAllResponse;
+import dprs.wthrash.AllDataResponse;
+import dprs.wthrash.BackupService;
+import dprs.wthrash.GetAddressRangesResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -92,7 +95,7 @@ public class UtilityController {
 
     public static final String READ_ALL = "/readAll";
     @RequestMapping(READ_ALL)
-    public ReadAllResponse readAll() {
-        return new ReadAllResponse(new HashMap(InMemoryDatabase.INSTANCE));
+    public ReadAllFromAllResponse readAll() {
+        return new ReadAllFromAllResponse(new HashMap(InMemoryDatabase.INSTANCE));
     }
 }

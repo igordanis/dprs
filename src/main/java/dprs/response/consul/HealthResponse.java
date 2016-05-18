@@ -1,4 +1,4 @@
-package dprs.response;
+package dprs.response.consul;
 
 public class HealthResponse {
     boolean status = true;

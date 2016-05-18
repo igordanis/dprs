@@ -1,18 +1,18 @@
-package dprs.response;
+package dprs.response.util;
 
 import dprs.wthrash.ResponseWithException;
 
 import java.util.HashMap;
 
-public class ReadAllResponse extends ResponseWithException {
+public class ReadAllFromAllResponse extends ResponseWithException {
 
     HashMap values;
 
-    public ReadAllResponse() {}
+    public ReadAllFromAllResponse() {}
 
-    public ReadAllResponse(Exception exception) {super(exception);}
+    public ReadAllFromAllResponse(Exception exception) {super(exception);}
 
-    public ReadAllResponse(HashMap values) {
+    public ReadAllFromAllResponse(HashMap values) {
         this.values = values;
     }
 
