@@ -5,6 +5,7 @@ import com.ecwid.consul.v1.QueryParams;
 import com.ecwid.consul.v1.catalog.model.CatalogService;
 import com.google.gson.Gson;
 import dprs.components.InMemoryDatabase;
+import dprs.controller.dynamo.WriteController;
 import dprs.entity.DatabaseEntry;
 import dprs.entity.NodeAddress;
 import org.slf4j.Logger;
@@ -12,6 +13,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -19,7 +21,7 @@ import java.net.URI;
 import java.util.*;
 import java.util.stream.Collectors;
 
-//@Service
+@Service
 public class BackupService {
     private static final Logger logger = LoggerFactory.getLogger(BackupService.class);
 
@@ -63,7 +65,7 @@ public class BackupService {
         params.put("data", new Gson().toJson(data));
         NodeAddress address = getAddressByOffset(offset);
         if (address != null) {
-            return sendData(getAddressByOffset(offset), TransportController.TRANSPORT_DATA, params);
+            return sendData(getAddressByOffset(offset), WriteController.DYNAMO_BULK_WRITE, params);
         } else {
             logger.error("Address was null. " + "Offset: " + offset);
             return null;
@@ -115,7 +117,7 @@ public class BackupService {
         }
     }
 
-    @Scheduled(fixedDelay = 5000)
+//    @Scheduled(fixedDelay = 5000)
     public void updateNodeAddresses() {
         logger.info("Polling actual chord state");
         List<NodeAddress> chordAddresses = new ArrayList<>();

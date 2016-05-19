@@ -2,7 +2,7 @@ package dprs.entity;
 
 import com.ecwid.consul.v1.catalog.model.CatalogService;
 
-public class NodeAddress {
+public class NodeAddress implements Comparable<NodeAddress> {
 
     private String address;
     private int port;
@@ -26,11 +26,14 @@ public class NodeAddress {
     }
 
     public Integer getHash() {
-        String s = address + ":" + port;
-        return new StringBuilder(s)
+        return new StringBuilder(getFullAddress())
                 .reverse()
                 .toString()
                 .hashCode();
+    }
+
+    public String getFullAddress() {
+        return address + ":" + port;
     }
 
     @Override
@@ -38,17 +41,13 @@ public class NodeAddress {
         return address + ":" + port;
     }
 
+    @Override
+    public int compareTo(NodeAddress nodeAddress) {
+        return getHash().compareTo(nodeAddress.getHash());
+    }
 
-//
-//    @Override
-//    public int compareTo(NodeAddress nodeAddress) {
-//        return getHash().compareTo(nodeAddress.getHash());
-//    }
-//
-//    @Override
-//    public boolean equals(Object nodeAddress) {
-//        return nodeAddress == null || address.equals(((NodeAddress) nodeAddress).getIP());
-//    }
-
-
+    @Override
+    public boolean equals(Object nodeAddress) {
+        return nodeAddress != null && getFullAddress().equals(((NodeAddress) nodeAddress).getFullAddress());
+    }
 }

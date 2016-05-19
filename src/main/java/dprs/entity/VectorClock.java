@@ -18,13 +18,12 @@ import static java.lang.Integer.max;
 /*
 * Neextenduje HashMap aby nebolo mozne priamo pouzivat HashMap metody
 */
-public class VectorClock{
+public class VectorClock {
 
 
     private static final Logger logger = LoggerFactory.getLogger(VectorClock.class);
 
     private Map<Integer, Integer> vectorClock = new HashMap();
-
 
 
     /*
@@ -39,11 +38,12 @@ public class VectorClock{
     private static int SECOND_VC_IS_NEWER = -1;
     private static int VC_ARE_SAME = 0;
     private static int VC_ARE_CONCURENT = 3;
-    private int compareTwoVectorClocks(VectorClock vc1, VectorClock vc2){
+
+    private int compareTwoVectorClocks(VectorClock vc1, VectorClock vc2) {
 
         Assert.isTrue(vectorKeysHaveCommonComponents(vc1, vc2),
-         "Vector clocks needs to have at least one common component to decide if they are " +
-                "in fact concurent for view of its component"
+                "Vector clocks needs to have at least one common component to decide if they are " +
+                        "in fact concurent for view of its component"
         );
 
 
@@ -55,17 +55,17 @@ public class VectorClock{
         VectorClock newerVectorClock = null;
         boolean areConcurent = false;
 
-        for(final Integer uniqVectorclockKey: uniqVectorClockKeys){
+        for (final Integer uniqVectorclockKey : uniqVectorClockKeys) {
             Integer value1 = vc1.vectorClock.getOrDefault(uniqVectorclockKey, 0);
-            Integer value2 =vc2.vectorClock.getOrDefault(uniqVectorclockKey, 0);
+            Integer value2 = vc2.vectorClock.getOrDefault(uniqVectorclockKey, 0);
 
             //hodnota vsetkych komponentov jedneho vector clocku musi byt voci vsetkym
             // komponentom druheho vector clocku neklesajuca - t.j. monotonne stupajuca.
-            switch (value1.compareTo(value2)){
+            switch (value1.compareTo(value2)) {
                 case -1:
                     // Druhy je novsi. Ak bol pocas iteracie niekedy novsi komponent druheho
                     // vectorclocku vznika konflikt
-                    if(newerVectorClock == vc1)
+                    if (newerVectorClock == vc1)
                         areConcurent = true;
                     else {
                         newerVectorClock = vc2;
@@ -75,21 +75,21 @@ public class VectorClock{
                 case 1:
                     // Prvy je novsi. Ak bol pocas iteracie niekedy novsi komponent druheho
                     // vectorclocku vznika konflikt
-                    if(newerVectorClock == vc2)
+                    if (newerVectorClock == vc2)
                         areConcurent = true;
                     else {
                         newerVectorClock = vc1;
 //                        areConcurent = false;
                     }
                     break;
-                case  0:
+                case 0:
                     //hodnoty komponentov su rovnake -> na zaklade tejto informacie nevieme povedat
                     //ktory vc je novsi
                     break;
             }
         }
 
-        if(areConcurent)
+        if (areConcurent)
             return VC_ARE_CONCURENT;
         else {
             if (newerVectorClock == null)
@@ -103,7 +103,7 @@ public class VectorClock{
         return -99999;
     }
 
-    private boolean vectorKeysHaveCommonComponents(VectorClock vc1, VectorClock vc2){
+    private boolean vectorKeysHaveCommonComponents(VectorClock vc1, VectorClock vc2) {
         final Set<Integer> uniqVectorClockKeys = new HashSet<>();
 
         uniqVectorClockKeys.addAll(vc1.vectorClock.keySet());
@@ -127,27 +127,24 @@ public class VectorClock{
 
     public void incrementValueForComponent(final Integer component) {
         // ak existuje hodnota, zvysi ju o 1
-        vectorClock.computeIfPresent(component, (key, oldVal) -> oldVal+1);
+        vectorClock.computeIfPresent(component, (key, oldVal) -> oldVal + 1);
 
         //ak neexistuje, je to ako keby bola predtym nula a preto ju nastavi na 1
         vectorClock.computeIfAbsent(component, c -> 1);
     }
-
 
     /*
      *
      */
     public boolean isThisNewerThan(final VectorClock other) {
         int comparisionResult = compareTwoVectorClocks(this, other);
-        return  comparisionResult == FIRST_VC_IS_NEWER;
+        return comparisionResult == FIRST_VC_IS_NEWER;
     }
 
-    public boolean isThisConcurentTo(VectorClock other){
+    public boolean isThisConcurentTo(VectorClock other) {
         final int comparisonResult = compareTwoVectorClocks(this, other);
         return comparisonResult == VC_ARE_CONCURENT;
     }
-
-
 
     /*
      * VZDY Nastavi na danu hodnotu pre komponent vector clocku
@@ -155,7 +152,6 @@ public class VectorClock{
     public void setValueForComponent(final Integer component, final Integer newValue) {
         vectorClock.put(component, newValue);
     }
-
 
     /*
      * Funkcia spoji kolekciu vectorClockov do jedneho - novsieho ako vsetky, ktore boli
@@ -196,63 +192,40 @@ public class VectorClock{
             resultingVectorClock.setValueForComponent(vectorClockKey, maxComponentForKey);
         }
 
-
         return resultingVectorClock;
     }
-
 
     /*
      * Serializacne metody
      */
     public String toJSON() {
-
-        final HashMap<String, String> serializableMap = new HashMap<>();
-
-        vectorClock.entrySet().forEach(e -> {
-            final String key = e.getKey().toString();
-            final String value = e.getValue().toString();
-            serializableMap.put(key, value);
-        });
-        return new Gson().toJson(serializableMap);
+        Type typeOfHashMap = new TypeToken<Map<Integer, Integer>>() {
+        }.getType();
+        return new Gson().toJson(vectorClock, typeOfHashMap);
     }
 
     public static VectorClock fromJSON(String json) {
-
         if (json == null || "".equals(json)) {
-
-            logger.debug("Vector clock doesnt contain any deserializable value. Creating empty " +
-                    "vector clock");
-
+            logger.debug("Vector clock doesnt contain any deserializable value. Creating empty " + "vector clock");
             return new VectorClock();
-
-        } else {
-
-            logger.debug("Attempting to deserialize vector clock from:  " + json);
-
-            /*
-             * GSON z nejakeho dovodu pridava do serializovanych stringov lomitka.
-             * Preto su odstranovane
-             */
-            final String replace = json.replace("\\", "");
-
-            Type typeOfHashMap = new TypeToken<Map<String, String>>() {
-            }.getType();
-
-            Map<String, String> deserializedMap = new Gson().fromJson(replace, typeOfHashMap);
-            Map<Integer, Integer> newMap = new HashMap<>();
-
-            deserializedMap.entrySet().forEach(e -> {
-                Integer integerKey = Integer.valueOf(e.getKey());
-                Integer integerValue = Integer.valueOf(e.getValue());
-                newMap.put(integerKey, integerValue);
-            });
-
-            final VectorClock vectorClock = new VectorClock();
-            vectorClock.vectorClock = newMap;
-            return vectorClock;
         }
-    }
 
+        logger.debug("Attempting to deserialize vector clock from:  " + json);
+
+        /*
+         * GSON z nejakeho dovodu pridava do serializovanych stringov lomitka.
+         * Preto su odstranovane
+        */
+        final String replace = json.replace("\\", "");
+
+        Type typeOfHashMap = new TypeToken<Map<Integer, Integer>>() {
+        }.getType();
+        Map<Integer, Integer> deserializedMap = new Gson().fromJson(replace, typeOfHashMap);
+
+        final VectorClock vectorClock = new VectorClock();
+        vectorClock.vectorClock = deserializedMap;
+        return vectorClock;
+    }
 
     /*
      * Pre ucely unittestov
@@ -288,11 +261,15 @@ public class VectorClock{
 
         VectorClock that = (VectorClock) o;
 
-        if(vectorClock != null) {
+        if (vectorClock != null) {
             final int comparisonResult = compareTwoVectorClocks(this, that);
             return comparisonResult == VC_ARE_SAME;
-        }else
+        } else
             return that.vectorClock == null;
     }
 
+    @Override
+    public String toString() {
+        return "VectorClock{" + vectorClock + '}';
+    }
 }

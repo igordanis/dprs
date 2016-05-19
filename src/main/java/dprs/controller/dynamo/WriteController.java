@@ -7,12 +7,13 @@ import dprs.entity.DatabaseEntry;
 import dprs.entity.NodeAddress;
 import dprs.entity.VectorClock;
 import dprs.response.dynamo.DynamoWriteResponse;
-import dprs.wthrash.WriteResponse;
+import dprs.service.DataManagerService;
 //import dprs.wthrash.BackupService;
 import dprs.service.ChordService;
 import dprs.wthrash.TransportDataResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.Marker;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
@@ -40,64 +41,92 @@ public class WriteController {
     @Autowired
     ChordService chordService;
 
-//    BackupService backupService;
+    @Autowired
+    DataManagerService dataManagerService;
 
     @Value("${quorum.write}")
     int writeQuorum;
 
+    @Value("${quorum.replication}")
+    int replicationQuorum;
 
     @RequestMapping(WriteController.WRITE)
-    public WriteResponse write(
+    public DynamoWriteResponse write(
             @RequestParam(value = "key") String key,
             @RequestParam(value = "value") String value,
-            @RequestParam(value = "vectorClock", required = false) String receivedVectorClock
+            @RequestParam(value = "vectorClock", required = false) String receivedVectorClock,
+            @RequestParam(value = "transactionId", required = false) String transactionId
     ) {
-        String transactionId = randomUUID().toString();
-        VectorClock deserializedClock = VectorClock.fromJSON(receivedVectorClock);
+        final String receivedTransactionId = transactionId != null ? transactionId : randomUUID().toString();
 
         /*
          * Find part of chord which manages given key
          */
-        List<NodeAddress> destinationAddresses = chordService.findDestinationAdressesForKey(
-                key, writeQuorum);
+        List<NodeAddress> destinationAddresses = chordService.findDestinationAddressesForKeyInChord(
+                key, replicationQuorum);
 
+        /*
+         * If not coordinator for key, forward to it
+         */
+        if (!destinationAddresses.get(0).equals(chordService.getSelfAddressInChord())) {
+            URI destinationUri = UriComponentsBuilder
+                    .fromUriString("http://" + destinationAddresses.get(0).getFullAddress())
+                    .path(WRITE)
+                    .queryParam("key", key)
+                    .queryParam("value", value)
+                    .queryParam("transactionId", receivedTransactionId)
+                    .queryParam("vectorClock", receivedVectorClock)
+                    .build()
+                    .toUri();
+            logger.info(receivedTransactionId + ": Forwarding write request to " + destinationUri);
+            return new RestTemplate().getForObject(destinationUri, DynamoWriteResponse.class);
+        }
 
+        // Counts successful writes. (Array because needs to be final)
+        final int[] successfulUpdates = {0};
 
         /*
          * Ziska write odpovede od vsetkych dynamo uzlov ktore maju zapisat objekt
          */
-
-        Set<DynamoWriteResponse> allResponses = destinationAddresses.stream()
+        Set<VectorClock> allVectorClocks = destinationAddresses.stream()
                 .map(destinationAddress -> {
 
                     URI destinationUri = UriComponentsBuilder
-                            .fromUriString("http://" + destinationAddress.getIP() + ":" +
-                                    destinationAddress.getPort())
+                            .fromUriString("http://" + destinationAddress.getFullAddress())
                             .path(DYNAMO_SINGLE_WRITE)
                             .queryParam("key", key)
                             .queryParam("value", value)
-                            .queryParam("transactionId", transactionId)
-                            .queryParam("vectorClock", deserializedClock.toJSON())
+                            .queryParam("transactionId", receivedTransactionId)
+                            .queryParam("vectorClock", receivedVectorClock)
                             .build()
                             .toUri();
 
-                    logger.info(transactionId, "Forwarding write request to: "
-                            + destinationUri);
+                    logger.info(receivedTransactionId +  ": Forwarding single write request to: " + destinationUri);
 
-                    return new RestTemplate()
-                            .getForObject(destinationUri, DynamoWriteResponse.class);
+                    // If an exception is thrown while sending request to other node, it was unsuccessful
+                    try {
+                        DynamoWriteResponse response = new RestTemplate().getForObject(destinationUri, DynamoWriteResponse.class);
+                        if (response.isUpdated()) {
+                            successfulUpdates[0]++;
+                        }
 
+                        return VectorClock.fromJSON(response.getVectorClock());
+                    } catch (Exception e) {
+                        logger.error(receivedTransactionId + ": Failed to send single write request to " + destinationUri);
+                        return null;
+                    }
                 })
                 .collect(Collectors.toSet());
 
+        /*
+         * ked vrati viacej vector clockov, tak ich mergne do jedneho
+         */
+        VectorClock mergedVectorClock = VectorClock.mergeToNewer(allVectorClocks);
+        logger.info(transactionId +  ": Merged vector clock: " + mergedVectorClock.toString() + " / "
+                + mergedVectorClock.toJSON() + " from " +
+                allVectorClocks);
 
-        //ak obsahuje kolekcia konkurentne vectorclocky, je nutne vratit
-        //mnozinu najnovsich vectorclockov ktore su konkurentne
-        //inak je nutne vratit jeden najnovsi vectorclock
-        //TODO: implement
-
-
-        return new WriteResponse(null, key);
+        return new DynamoWriteResponse(successfulUpdates[0] >= writeQuorum, mergedVectorClock.toJSON());
     }
 
 
@@ -108,13 +137,15 @@ public class WriteController {
             @RequestParam(value = "transactionId", required = true) String transactionId,
             @RequestParam(value = "vectorClock", required = true) String vc
     ) {
+        InMemoryDatabase database = InMemoryDatabase.INSTANCE;
         logger.info(transactionId + ": Received request for concrete write: " + key);
-
+        // Checks if update is successful. (Array because it needs to be final)
+        final boolean[] updated = {true};
         final VectorClock vectorClock = VectorClock.fromJSON(vc);
 
         final Integer selfIndexInChord = chordService.getSelfIndexInChord();
 
-        InMemoryDatabase.INSTANCE.computeIfPresent(key, (k, oldVal) -> {
+        database.computeIfPresent(key, (k, oldVal) -> {
 
             if (vectorClock.isThisNewerThan(oldVal.getVectorClock())) {
                 logger.info("New value has been updated");
@@ -122,18 +153,18 @@ public class WriteController {
                 return new DatabaseEntry(value, vectorClock);
             } else {
                 logger.info("Old value has been kept");
+                updated[0] = false;
                 return oldVal;
             }
         });
 
-        InMemoryDatabase.INSTANCE.computeIfAbsent(key, k  -> {
-            final VectorClock vectorClock1 = VectorClock.fromJSON(vc);
-            vectorClock1.incrementValueForComponent(selfIndexInChord);
-            return new DatabaseEntry(value,vectorClock1);
+        database.computeIfAbsent(key, k -> {
+            final VectorClock newVectorClock = VectorClock.fromJSON(vc);
+            newVectorClock.incrementValueForComponent(selfIndexInChord);
+            return new DatabaseEntry(value, newVectorClock);
         });
 
-
-        return new DynamoWriteResponse(true, vectorClock.toJSON());
+        return new DynamoWriteResponse(updated[0], database.get(key).getVectorClock().toJSON());
     }
 
     @RequestMapping(DYNAMO_BULK_WRITE)

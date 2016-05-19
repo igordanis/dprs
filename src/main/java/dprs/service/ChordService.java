@@ -12,9 +12,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.w3c.dom.Node;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * Created by igordanis on 16/05/16.
@@ -25,6 +27,9 @@ public class ChordService {
     @Autowired
     ConsulClient consulClient;
 
+    @Autowired
+    Environment environment;
+
     @Value("${spring.application.name}")
     String applicationName;
 
@@ -32,48 +37,65 @@ public class ChordService {
 
     Map<Integer, NodeAddress> chordAddresses = new HashMap<>();
 
-
     @Scheduled(fixedDelay = 5000)
     public void updateNodeAddresses() {
-        logger.info("Polling current chord state");
-
         List<CatalogService> catalogServiceList = consulClient.getCatalogService(applicationName,
                 QueryParams.DEFAULT).getValue();
 
-
         if (chordChanged(catalogServiceList)) {
-            logger.info("   Found changes in chord: ");
+            logger.info("Found changes in chord: ");
 
-            addedAddresses(catalogServiceList).stream().forEach(a -> {
-                logger.info("       Found new machine in chord: " + a.getIP());
+            List<NodeAddress> addedAddresses = addedAddresses(catalogServiceList);
+            List<NodeAddress> removedAddresses = removedAdresses(catalogServiceList);
+            NodeAddress currentNextAddress = getAddressInChordByOffset(1);
+            NodeAddress currentPreviousAddress = getAddressInChordByOffset(-1);
+
+            addedAddresses.stream().forEach(a -> {
+                logger.info("   Found new machine in chord: " + a.getIP());
                 chordAddresses.put(a.getHash(), a);
             });
 
-            removedAdresses(catalogServiceList).stream().forEach(b -> {
-                logger.info("       Found removed machine in chord: " + b.getIP());
+            removedAddresses.stream().forEach(b -> {
+                logger.info("   Found removed machine in chord: " + b.getIP());
                 chordAddresses.remove(b.getHash());
             });
 
-        } else {
-            logger.info("   No changes found in chord.");
+            if (currentNextAddress != null) {
+                if (removedAddresses.contains(currentNextAddress)) {
+                    // Handle failure of next node
+                    logger.info("Failure of next node.");
+                } else if (!currentNextAddress.equals(getAddressInChordByOffset(1))) {
+                    // Handle new next node
+                    logger.info("New next node.");
+                }
+            }
+
+            if (currentPreviousAddress != null) {
+                if (removedAddresses.contains(currentPreviousAddress)) {
+                    // Handle failure of previous node
+                    logger.info("Failure of previous node.");
+                } else if (!currentPreviousAddress.equals(getAddressInChordByOffset(-1))) {
+                    // Handle new previous node
+                    logger.info("New previous node.");
+                }
+            }
+
+            logger.info("Current machines in chord: " + chordAddresses.values().stream()
+                    .map(a -> a.getHash() + " - " + a.getIP() + ":" + a.getPort())
+                    .collect(Collectors.toList())
+            );
         }
-        logger.info("Current machines in chord: " + chordAddresses.values().stream()
-                .map(a ->  a.getHash() + " - " + a.getIP().toString() + ":" + new Integer(a
-                        .getPort())
-                        .toString())
-                .collect(Collectors.toList())
-        );
     }
 
     private boolean chordChanged(List<CatalogService> catalogServiceList) {
 
         boolean changed = false;
 
-        //nieco sa pridalo alebo ubralo
+        // nieco sa pridalo alebo ubralo
         if (catalogServiceList.size() != chordAddresses.size())
             return true;
 
-        //zmenil sa nejaky konkretny uzol
+        // zmenil sa nejaky konkretny uzol
         if (addedAddresses(catalogServiceList).size() > 0
                 || removedAdresses(catalogServiceList).size() > 0)
             return true;
@@ -92,7 +114,6 @@ public class ChordService {
         return listOfAdditions;
     }
 
-
     private List<NodeAddress> removedAdresses(List<CatalogService> catalogServiceList) {
 
         final Set<Integer> consulAdresses = catalogServiceList.stream()
@@ -106,14 +127,73 @@ public class ChordService {
         return removedAdresses;
     }
 
-
-
     private boolean containsAdress(CatalogService c) {
         return chordAddresses.containsKey(new NodeAddress(c).getHash());
     }
 
+    public List<NodeAddress> findDestinationAddressesForKeyInChord(String key, int numberOfAddresses) {
+        return findDestinationAddressesForKeyInList(chordAddresses.values(), key, numberOfAddresses);
+    }
 
-    public List<NodeAddress> findDestinationAdressesForKey(String key, int numberOfAdresses){
+    public List<NodeAddress> findDestinationAddressesForKeyInList(Collection<NodeAddress> addressList, String key, int numberOfAddresses) {
+        List<NodeAddress> sortedAddresses = addressList.stream().sorted().collect(Collectors.toList());
+
+        if (chordAddresses.size() < numberOfAddresses) {
+            logger.warn("Chord contains only " + chordAddresses.size() + " #nodes. Client requires " + numberOfAddresses);
+            return sortedAddresses;
+        }
+
+        // Find first address
+        NodeAddress firstAddress = sortedAddresses.stream().filter(a -> a.getHash() >= key.hashCode()).findFirst().get();
+
+        // If first address is still null, the last address is responsible for key.
+        if (firstAddress == null) {
+            firstAddress = sortedAddresses.get(sortedAddresses.size() - 1);
+        }
+
+        int firstAddressIndex = sortedAddresses.indexOf(firstAddress);
+
+        // Collect #numbeOfAddresses addresses starting with first address (with overflow)
+        List<NodeAddress> resultAddresses = IntStream.range(0, numberOfAddresses).mapToObj(i -> {
+            int targetIndex = (firstAddressIndex + i) % chordAddresses.size();
+            return sortedAddresses.get(targetIndex);
+        }).collect(Collectors.<NodeAddress>toList());
+
+        return resultAddresses;
+    }
+
+    public Integer getSelfIndexInChord() {
+
+        Integer port = Integer.valueOf(environment.getProperty("local.server.port"));
+
+        Member self = consulClient.getAgentSelf()
+                .getValue()
+                .getMember();
+
+        return new NodeAddress(self.getAddress(), port).getHash();
+    }
+
+    public NodeAddress getSelfAddressInChord() {
+        return this.chordAddresses.get(getSelfIndexInChord());
+    }
+
+    public NodeAddress getAddressInChordByOffset(int offset) {
+        logger.info("Chord: " + chordAddresses.size() + " Addresses: " + chordAddresses.values().size() + " Offset: " + offset);
+        if (chordAddresses.size() == 0) {
+            return null;
+        }
+
+        int myIndex = getSelfIndexInChord();
+        int targetAddressIndex = (myIndex + offset + chordAddresses.size()) % chordAddresses.size();
+        return chordAddresses.get(targetAddressIndex);
+    }
+
+    public Map<Integer, NodeAddress> getChordAddresses() {
+        return chordAddresses;
+    }
+
+
+    public List<NodeAddress> oldFindDestinationAddressesForKey(String key, int numberOfAddresses) {
 
         Integer keyIndex = key.hashCode();
 
@@ -127,15 +207,14 @@ public class ChordService {
 
 
         //ak je v chorde menej uzlov ako pozadujeme
-        if(chordAddresses.size() <  numberOfAdresses){
+        if(chordAddresses.size() <  numberOfAddresses){
 
             logger.warn("Chord contains only " + chordAddresses.size() + " #nodes. Client " +
-                    "requires " + numberOfAdresses);
+                    "requires " + numberOfAddresses);
 
             return chordAddresses.values().stream()
                     .collect(Collectors.toList());
         }
-
 
         final List<Map.Entry<Integer, NodeAddress>> collect = chordAddresses.entrySet().stream()
                 //zosortujem nody podla indexu v chorde
@@ -146,22 +225,21 @@ public class ChordService {
 
         //vyberiem iba prvych N alebo menej ak som nakonci listu - quorum
         final List<NodeAddress> nodeAddress = collect
-                .subList(0, numberOfAdresses <= collect.size() ? numberOfAdresses : collect.size())
+                .subList(0, numberOfAddresses <= collect.size() ? numberOfAddresses : collect.size())
                 .stream()
                 //vratim zoznam adries
                 .map(a -> a.getValue())
                 .collect(Collectors.toList());
 
-
         //ak je v nodeAdresach menej ako numberOfAdresses, znamena ze chord je nutne
         //pretiect
         List<NodeAddress> overflownAdresses = new ArrayList<>();
-        if(nodeAddress.size() < numberOfAdresses){
+        if(nodeAddress.size() < numberOfAddresses){
             overflownAdresses = chordAddresses.entrySet().stream()
                     //zosortujem nody podla indexu v chorde
                     .sorted((o1, o2) -> o1.getKey().compareTo(o2.getKey()))
                     .collect(Collectors.toList())
-                    .subList(0, numberOfAdresses - nodeAddress.size())
+                    .subList(0, numberOfAddresses - nodeAddress.size())
                     .stream()
                     .map(a -> a.getValue())
                     .collect(Collectors.toList());
@@ -173,32 +251,11 @@ public class ChordService {
             logger.warn("Required adresses needed overflow");
 
             return result;
-        }else{
+        } else {
 
             logger.warn("Required adresses found without overflow");
 
             return nodeAddress;
         }
     }
-
-
-    @Autowired
-    Environment environment;
-
-
-    public Integer getSelfIndexInChord(){
-
-        Integer port = Integer.valueOf(environment.getProperty("local.server.port"));
-
-        Member self = consulClient.getAgentSelf()
-                .getValue()
-                .getMember();
-
-        return new NodeAddress(self.getAddress(), port).getHash();
-    }
-
-    public NodeAddress getSelfAddresssInChord(){
-        return this.chordAddresses.get(getSelfIndexInChord());
-    }
-
 }

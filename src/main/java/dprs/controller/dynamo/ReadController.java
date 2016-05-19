@@ -36,7 +36,6 @@ public class ReadController {
     @Autowired
     ChordService chordService;
 
-
     @RequestMapping(ReadController.READ)
     public ReadAllFromSelfResponse read(
             @RequestParam(value = "key") String key,
@@ -47,7 +46,7 @@ public class ReadController {
         /*
          * Find part of chord which manages given key
          */
-        List<NodeAddress> destinationAddresses = chordService.findDestinationAdressesForKey(key, readQuorum);
+        List<NodeAddress> destinationAddresses = chordService.findDestinationAddressesForKeyInChord(key, readQuorum);
 
         /*
          * Ziska read odpovede od vsetkych dynamo uzlov ktore maju obsahovat dany objekt
