@@ -116,7 +116,7 @@ public class WriteController {
 
         InMemoryDatabase.INSTANCE.computeIfPresent(key, (k, oldVal) -> {
 
-            if (vectorClock.isThisNewerThan(oldVal.getVectorClock(), selfIndexInChord)) {
+            if (vectorClock.isThisNewerThan(oldVal.getVectorClock())) {
                 logger.info("New value has been updated");
                 vectorClock.incrementValueForComponent(selfIndexInChord);
                 return new DatabaseEntry(value, vectorClock);

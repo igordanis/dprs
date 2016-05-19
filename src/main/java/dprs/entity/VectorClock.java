@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.util.Assert;
 
 import java.lang.reflect.Type;
 import java.util.HashMap;
@@ -12,6 +13,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static java.lang.Integer.max;
+
 
 /*
 * Neextenduje HashMap aby nebolo mozne priamo pouzivat HashMap metody
@@ -24,41 +26,128 @@ public class VectorClock{
     private Map<Integer, Integer> vectorClock = new HashMap();
 
 
-    public void incrementValueForComponent(final Integer component) {
 
-        // ak existuje hodnota, zvysi ju o 1
-        vectorClock.computeIfPresent(component, (key, oldVal) -> oldVal+1);
+    /*
+   * Zisti, ci su konkurentne - alebo ci je niektory z nich novsi
+   * vracia:
+   *    a\ 3    ak su konkurentne
+   *    b\ 0    ak su rovnake
+   *    c\ 1    ak je prvy novsi
+   *    d\ -1   ak je druhy novsi
+   */
+    private static int FIRST_VC_IS_NEWER = 1;
+    private static int SECOND_VC_IS_NEWER = -1;
+    private static int VC_ARE_SAME = 0;
+    private static int VC_ARE_CONCURENT = 3;
+    private int compareTwoVectorClocks(VectorClock vc1, VectorClock vc2){
 
-        //ak neexistuje, ako keby bola predtym nula a preto ju nastavi na 1
-        vectorClock.computeIfAbsent(component, c -> 1);
+        Assert.isTrue(vectorKeysHaveCommonComponents(vc1, vc2),
+         "Vector clocks needs to have at least one common component to decide if they are " +
+                "in fact concurent for view of its component"
+        );
 
+
+        final Set<Integer> uniqVectorClockKeys = new HashSet<>();
+
+        uniqVectorClockKeys.addAll(vc1.vectorClock.keySet());
+        uniqVectorClockKeys.addAll(vc2.vectorClock.keySet());
+
+        VectorClock newerVectorClock = null;
+        boolean areConcurent = false;
+
+        for(final Integer uniqVectorclockKey: uniqVectorClockKeys){
+            Integer value1 = vc1.vectorClock.getOrDefault(uniqVectorclockKey, 0);
+            Integer value2 =vc2.vectorClock.getOrDefault(uniqVectorclockKey, 0);
+
+            //hodnota vsetkych komponentov jedneho vector clocku musi byt voci vsetkym
+            // komponentom druheho vector clocku neklesajuca - t.j. monotonne stupajuca.
+            switch (value1.compareTo(value2)){
+                case -1:
+                    // Druhy je novsi. Ak bol pocas iteracie niekedy novsi komponent druheho
+                    // vectorclocku vznika konflikt
+                    if(newerVectorClock == vc1)
+                        areConcurent = true;
+                    else {
+                        newerVectorClock = vc2;
+//                        areConcurent = false;
+                    }
+                    break;
+                case 1:
+                    // Prvy je novsi. Ak bol pocas iteracie niekedy novsi komponent druheho
+                    // vectorclocku vznika konflikt
+                    if(newerVectorClock == vc2)
+                        areConcurent = true;
+                    else {
+                        newerVectorClock = vc1;
+//                        areConcurent = false;
+                    }
+                    break;
+                case  0:
+                    //hodnoty komponentov su rovnake -> na zaklade tejto informacie nevieme povedat
+                    //ktory vc je novsi
+                    break;
+            }
+        }
+
+        if(areConcurent)
+            return VC_ARE_CONCURENT;
+        else {
+            if (newerVectorClock == null)
+                return VC_ARE_SAME;
+            if (newerVectorClock == vc1)
+                return FIRST_VC_IS_NEWER;
+            if (newerVectorClock == vc2)
+                return SECOND_VC_IS_NEWER;
+        }
+        //sem sa nikdy nedostaneme
+        return -99999;
+    }
+
+    private boolean vectorKeysHaveCommonComponents(VectorClock vc1, VectorClock vc2){
+        final Set<Integer> uniqVectorClockKeys = new HashSet<>();
+
+        uniqVectorClockKeys.addAll(vc1.vectorClock.keySet());
+        uniqVectorClockKeys.addAll(vc2.vectorClock.keySet());
+
+        //zistime ci maju vectorclocky spolocne komponenty
+
+        final long countOfCommonKeys = uniqVectorClockKeys.stream()
+                //namapujeme na to ci je spolocny
+                .map(uniqVectorClockKey -> {
+                    return vc1.vectorClock.containsKey(uniqVectorClockKey)
+                            && vc2.vectorClock.containsKey(uniqVectorClockKey);
+                })
+                //vyberieme iba spolocne
+                .filter(r -> r == true)
+                //a spocitame
+                .count();
+        return countOfCommonKeys > 0;
     }
 
 
-    public boolean isThisNewerThan(final VectorClock other, final Integer byComponent) {
-        return compareToByComponent(other, byComponent) == 1;
+    public void incrementValueForComponent(final Integer component) {
+        // ak existuje hodnota, zvysi ju o 1
+        vectorClock.computeIfPresent(component, (key, oldVal) -> oldVal+1);
+
+        //ak neexistuje, je to ako keby bola predtym nula a preto ju nastavi na 1
+        vectorClock.computeIfAbsent(component, c -> 1);
     }
 
 
     /*
-    *  Funkcia porovna dva vector clocky.
-    *   0 ak su rovnake
-    *   -1 ak je this starsi
-    *   1 ak je this novsi
-    */
-    private int compareToByComponent(final VectorClock other, final Integer component) {
-        final Integer otherValue = other.vectorClock.get(component);
-        final Integer thisValue = this.vectorClock.get(component);
-
-        if (thisValue == null && otherValue == null)
-            return 0;
-        if (thisValue != null && otherValue == null)
-            return 1;
-        if (thisValue == null && otherValue != null)
-            return -1;
-        //if(thisValue != null && otherValue != null)
-        return thisValue.compareTo(otherValue);
+     *
+     */
+    public boolean isThisNewerThan(final VectorClock other) {
+        int comparisionResult = compareTwoVectorClocks(this, other);
+        return  comparisionResult == FIRST_VC_IS_NEWER;
     }
+
+    public boolean isThisConcurentTo(VectorClock other){
+        final int comparisonResult = compareTwoVectorClocks(this, other);
+        return comparisonResult == VC_ARE_CONCURENT;
+    }
+
+
 
     /*
      * VZDY Nastavi na danu hodnotu pre komponent vector clocku
@@ -70,7 +159,7 @@ public class VectorClock{
 
     /*
      * Funkcia spoji kolekciu vectorClockov do jedneho - novsieho ako vsetky, ktore boli
-     * do funkcie poslane
+     * do funkcie poslane. Pri spajani nezalezi na tom ci su konkurentne
      */
     public static VectorClock mergeToNewer(Set<VectorClock> setOfVectorClocks) {
 
@@ -165,29 +254,45 @@ public class VectorClock{
     }
 
 
+    /*
+     * Pre ucely unittestov
+     */
+//    private boolean equalz(VectorClock that) {
+//
+//        if (that == null )
+//            return false;
+//
+//
+//        final Set<Integer> uniqVectorClockKeys = new HashSet<>();
+//
+//        uniqVectorClockKeys.addAll(this.vectorClock.keySet());
+//        uniqVectorClockKeys.addAll(that.vectorClock.keySet());
+//
+//        for(Integer uniqKey : uniqVectorClockKeys){
+//            Integer thisValue = this.vectorClock.get(uniqKey);
+//            Integer thatValue = this.vectorClock.get(uniqKey);
+//
+//            //staci ze najdeme jeden rozdiel -> nie su rovnake
+//            if(thisValue.compareTo(thatValue) != 0)
+//                return false;
+//        }
+//
+//        return true;
+//    }
+
 
     @Override
     public boolean equals(Object o) {
-
+        if (this == o) return true;
         if (o == null || this.getClass() != o.getClass()) return false;
 
         VectorClock that = (VectorClock) o;
 
-        final Set<Integer> uniqVectorClockKeys = new HashSet<>();
-
-        uniqVectorClockKeys.addAll(this.vectorClock.keySet());
-        uniqVectorClockKeys.addAll(that.vectorClock.keySet());
-
-        for(Integer uniqKey : uniqVectorClockKeys){
-            Integer thisValue = this.vectorClock.get(uniqKey);
-            Integer thatValue = this.vectorClock.get(uniqKey);
-
-            //staci ze najdeme jeden rozdiel -> nie su rovnake
-            if(thisValue.compareTo(thatValue) != 0)
-                return false;
-        }
-
-        return true;
+        if(vectorClock != null) {
+            final int comparisonResult = compareTwoVectorClocks(this, that);
+            return comparisonResult == VC_ARE_SAME;
+        }else
+            return that.vectorClock == null;
     }
 
 }

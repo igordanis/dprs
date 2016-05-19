@@ -2,11 +2,13 @@ package dprs.entity;
 
 import org.junit.Test;
 
+import javax.validation.constraints.AssertTrue;
 import java.util.HashSet;
 
 import static dprs.entity.VectorClock.fromJSON;
 import static dprs.entity.VectorClock.mergeToNewer;
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.*;
+//import static org.junit.Assert.assertNotEquals;
 
 
 public class VectorClockTest {
@@ -19,10 +21,9 @@ public class VectorClockTest {
 
 
     /*
-     * a|-> Maju vsetky vsetky kompoenty rovnake
-         * b| Co ak maju iba niektore kompoenty spolocne ? TODO
-         * c| Co ak nemaju ziadne kompoenty spolocne ? TODO
-
+     * a|-> Maju vsetky alebo niektore kompoenty rovnake
+         * c| Co ak nemaju ziadne kompoenty spolocne ?
+         *      - neda sa povedat ci su konkurentne
     */
     private void initNonconcurent(){
 
@@ -33,10 +34,26 @@ public class VectorClockTest {
         nonConcurentOlderVectorClock.setValueForComponent(2, 5);
         nonConcurentOlderVectorClock.setValueForComponent(3, 2);
 
+
         nonConcurentNewerVectorClock.setValueForComponent(1, 2);
         nonConcurentNewerVectorClock.setValueForComponent(2, 5);
         nonConcurentNewerVectorClock.setValueForComponent(3, 2);
+        nonConcurentNewerVectorClock.setValueForComponent(4, 1);
 
+    }
+    
+    private void initConcurent(){
+        concurentVectorClock1 = new VectorClock();
+        concurentVectorClock2 = new VectorClock();
+
+        concurentVectorClock1.setValueForComponent(1, 2);
+        concurentVectorClock1.setValueForComponent(2, 5);
+        concurentVectorClock1.setValueForComponent(3, 2);
+        concurentVectorClock1.setValueForComponent(4, 1);
+
+        concurentVectorClock2.setValueForComponent(1, 2);
+        concurentVectorClock2.setValueForComponent(2, 6);
+        concurentVectorClock2.setValueForComponent(3, 1);
     }
 
 
@@ -51,14 +68,32 @@ public class VectorClockTest {
 
         final VectorClock resultingVectorClock = mergeToNewer(objects);
 
-        final VectorClock expectedVectorClock = new VectorClock();
+        VectorClock expectedVectorClock = new VectorClock();
+        expectedVectorClock.setValueForComponent(2, 6);
+        expectedVectorClock.setValueForComponent(3, 3);
         expectedVectorClock.setValueForComponent(1, 3);
-        expectedVectorClock.setValueForComponent(1, 6);
-        expectedVectorClock.setValueForComponent(1, 3);
+        expectedVectorClock.setValueForComponent(4, 2);
 
-        assertEquals(resultingVectorClock, expectedVectorClock);
+        assertEquals(resultingVectorClock,expectedVectorClock);
+        assertTrue(expectedVectorClock.isThisNewerThan(nonConcurentNewerVectorClock));
+        assertTrue(expectedVectorClock.isThisNewerThan(nonConcurentOlderVectorClock));
+        assertNotEquals(expectedVectorClock,nonConcurentNewerVectorClock);
+        assertNotEquals(expectedVectorClock,nonConcurentOlderVectorClock);
     }
 
+    @Test
+    public void testNonconcurency(){
+        initNonconcurent();
+        assertNotEquals(nonConcurentNewerVectorClock, nonConcurentOlderVectorClock);
+        assertTrue(nonConcurentNewerVectorClock.isThisNewerThan(nonConcurentOlderVectorClock));
+    }
+
+    @Test
+    public void testConcurency(){
+        initConcurent();
+        assertTrue(concurentVectorClock1.isThisConcurentTo(concurentVectorClock2));
+        assertNotEquals(concurentVectorClock1, concurentVectorClock2);
+    }
 
 
     @Test
@@ -74,5 +109,30 @@ public class VectorClockTest {
     }
 
     @Test
-    public void testIncrement() throws Exception {}
+    public void testIncrement() throws Exception {
+        initNonconcurent();
+        nonConcurentOlderVectorClock.incrementValueForComponent(1);
+        nonConcurentOlderVectorClock.incrementValueForComponent(3);
+
+        VectorClock expectedVectorClock = new VectorClock();
+        expectedVectorClock.setValueForComponent(1, 2);
+        expectedVectorClock.setValueForComponent(2, 5);
+        expectedVectorClock.setValueForComponent(3, 3);
+
+        assertEquals(nonConcurentOlderVectorClock, expectedVectorClock);
+
+    }
+
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testAssertion(){
+        VectorClock vc1 = new VectorClock();
+        vc1.setValueForComponent(1, 4);
+
+        VectorClock vc2 = new VectorClock();
+        vc2.setValueForComponent(2,3);
+
+        vc1.isThisNewerThan(vc2);
+    }
+
 }
