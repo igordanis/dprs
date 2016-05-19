@@ -88,7 +88,6 @@ public class ChordService {
     }
 
     private boolean chordChanged(List<CatalogService> catalogServiceList) {
-
         boolean changed = false;
 
         // nieco sa pridalo alebo ubralo
@@ -105,7 +104,6 @@ public class ChordService {
 
 
     private List<NodeAddress> addedAddresses(List<CatalogService> catalogServiceList) {
-
         final List<NodeAddress> listOfAdditions = catalogServiceList.stream()
                 .filter(address -> !containsAdress(address))
                 .map(address -> new NodeAddress(address))
@@ -115,7 +113,6 @@ public class ChordService {
     }
 
     private List<NodeAddress> removedAdresses(List<CatalogService> catalogServiceList) {
-
         final Set<Integer> consulAdresses = catalogServiceList.stream()
                 .map(a -> new NodeAddress(a).getHash())
                 .collect(Collectors.toSet());
@@ -163,7 +160,6 @@ public class ChordService {
     }
 
     public Integer getSelfIndexInChord() {
-
         Integer port = Integer.valueOf(environment.getProperty("local.server.port"));
 
         Member self = consulClient.getAgentSelf()
@@ -178,7 +174,6 @@ public class ChordService {
     }
 
     public NodeAddress getAddressInChordByOffset(int offset) {
-        logger.info("Chord: " + chordAddresses.size() + " Addresses: " + chordAddresses.values().size() + " Offset: " + offset);
         if (chordAddresses.size() == 0) {
             return null;
         }
@@ -191,71 +186,69 @@ public class ChordService {
     public Map<Integer, NodeAddress> getChordAddresses() {
         return chordAddresses;
     }
-
-
-    public List<NodeAddress> oldFindDestinationAddressesForKey(String key, int numberOfAddresses) {
-
-        Integer keyIndex = key.hashCode();
-
-        final List<String> strings = chordAddresses.entrySet().stream()
-                .sorted((o1, o2) -> o1.getKey().compareTo(o2.getKey()))
-                .map(e -> "\n" + e.getKey() + " - " + e.getValue().toString())
-                .collect(Collectors.toList());
-
-        logger.info("Searching adresses for key " + key + " : with index " + keyIndex +
-                "Available nodes: " + strings);
-
-
-        //ak je v chorde menej uzlov ako pozadujeme
-        if(chordAddresses.size() <  numberOfAddresses){
-
-            logger.warn("Chord contains only " + chordAddresses.size() + " #nodes. Client " +
-                    "requires " + numberOfAddresses);
-
-            return chordAddresses.values().stream()
-                    .collect(Collectors.toList());
-        }
-
-        final List<Map.Entry<Integer, NodeAddress>> collect = chordAddresses.entrySet().stream()
-                //zosortujem nody podla indexu v chorde
-                .sorted((o1, o2) -> o1.getKey().compareTo(o2.getKey()))
-                //najdem nody s vacsim indexom ako hash
-                .filter(o -> o.getKey() >= keyIndex)
-                .collect(Collectors.toList());
-
-        //vyberiem iba prvych N alebo menej ak som nakonci listu - quorum
-        final List<NodeAddress> nodeAddress = collect
-                .subList(0, numberOfAddresses <= collect.size() ? numberOfAddresses : collect.size())
-                .stream()
-                //vratim zoznam adries
-                .map(a -> a.getValue())
-                .collect(Collectors.toList());
-
-        //ak je v nodeAdresach menej ako numberOfAdresses, znamena ze chord je nutne
-        //pretiect
-        List<NodeAddress> overflownAdresses = new ArrayList<>();
-        if(nodeAddress.size() < numberOfAddresses){
-            overflownAdresses = chordAddresses.entrySet().stream()
-                    //zosortujem nody podla indexu v chorde
-                    .sorted((o1, o2) -> o1.getKey().compareTo(o2.getKey()))
-                    .collect(Collectors.toList())
-                    .subList(0, numberOfAddresses - nodeAddress.size())
-                    .stream()
-                    .map(a -> a.getValue())
-                    .collect(Collectors.toList());
-
-            final ArrayList<NodeAddress> result = new ArrayList<>();
-            result.addAll(nodeAddress);
-            result.addAll(overflownAdresses);
-
-            logger.warn("Required adresses needed overflow");
-
-            return result;
-        } else {
-
-            logger.warn("Required adresses found without overflow");
-
-            return nodeAddress;
-        }
-    }
+    
+//    public List<NodeAddress> oldFindDestinationAddressesForKey(String key, int numberOfAddresses) {
+//        Integer keyIndex = key.hashCode();
+//
+//        final List<String> strings = chordAddresses.entrySet().stream()
+//                .sorted((o1, o2) -> o1.getKey().compareTo(o2.getKey()))
+//                .map(e -> "\n" + e.getKey() + " - " + e.getValue().toString())
+//                .collect(Collectors.toList());
+//
+//        logger.info("Searching adresses for key " + key + " : with index " + keyIndex +
+//                "Available nodes: " + strings);
+//
+//
+//        //ak je v chorde menej uzlov ako pozadujeme
+//        if(chordAddresses.size() <  numberOfAddresses){
+//
+//            logger.warn("Chord contains only " + chordAddresses.size() + " #nodes. Client " +
+//                    "requires " + numberOfAddresses);
+//
+//            return chordAddresses.values().stream()
+//                    .collect(Collectors.toList());
+//        }
+//
+//        final List<Map.Entry<Integer, NodeAddress>> collect = chordAddresses.entrySet().stream()
+//                //zosortujem nody podla indexu v chorde
+//                .sorted((o1, o2) -> o1.getKey().compareTo(o2.getKey()))
+//                //najdem nody s vacsim indexom ako hash
+//                .filter(o -> o.getKey() >= keyIndex)
+//                .collect(Collectors.toList());
+//
+//        //vyberiem iba prvych N alebo menej ak som nakonci listu - quorum
+//        final List<NodeAddress> nodeAddress = collect
+//                .subList(0, numberOfAddresses <= collect.size() ? numberOfAddresses : collect.size())
+//                .stream()
+//                //vratim zoznam adries
+//                .map(a -> a.getValue())
+//                .collect(Collectors.toList());
+//
+//        //ak je v nodeAdresach menej ako numberOfAdresses, znamena ze chord je nutne
+//        //pretiect
+//        List<NodeAddress> overflownAdresses = new ArrayList<>();
+//        if(nodeAddress.size() < numberOfAddresses){
+//            overflownAdresses = chordAddresses.entrySet().stream()
+//                    //zosortujem nody podla indexu v chorde
+//                    .sorted((o1, o2) -> o1.getKey().compareTo(o2.getKey()))
+//                    .collect(Collectors.toList())
+//                    .subList(0, numberOfAddresses - nodeAddress.size())
+//                    .stream()
+//                    .map(a -> a.getValue())
+//                    .collect(Collectors.toList());
+//
+//            final ArrayList<NodeAddress> result = new ArrayList<>();
+//            result.addAll(nodeAddress);
+//            result.addAll(overflownAdresses);
+//
+//            logger.warn("Required adresses needed overflow");
+//
+//            return result;
+//        } else {
+//
+//            logger.warn("Required adresses found without overflow");
+//
+//            return nodeAddress;
+//        }
+//    }
 }
