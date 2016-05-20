@@ -143,7 +143,8 @@ public class WriteController {
             DatabaseEntry oldValue = database.get(key);
 
             if (vectorClock.isNewerThan(oldValue.getVectorClock())) {
-                // Received vector clock is newer than existing
+                // Received vector clock is newer than existing. Combine them and save.
+                vectorClock.addDisjunctiveValuesFrom(oldValue.getVectorClock());
                 database.put(key, new DatabaseEntry(value, vectorClock));
             } else {
                 // Received vector clock is older than existing
@@ -161,7 +162,6 @@ public class WriteController {
 
     @RequestMapping(DYNAMO_BULK_WRITE)
     public TransportDataResponse bulkWrite(@RequestParam(value = "data") String data) {
-
         InMemoryDatabase database = InMemoryDatabase.INSTANCE;
 
         HashMap<String, DatabaseEntry> dataMap = new Gson()
