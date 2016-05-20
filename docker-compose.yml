@@ -34,15 +34,12 @@ services:
     # Access ip addresses at http://localhost:8500/v1/catalog/service/web-service
     # Required SERVICE_TAGS web for dynamic registration
     dynamo:
-        build:
-          context: ./docker/dynamo
-          args:
-            - "constraint:node==swarm-node-02"
-
+        build:  ./docker/dynamo
         environment:
           SERVICE_80_NAME: dynamo
           SERVICE_NAME: dynamo
           SERVICE_TAGS: dynamo
+           - "constraint:node==swarm-node-02"
         ports:
           - "8080"
         depends_on:
@@ -50,15 +47,12 @@ services:
           - logstash
 
     dynamo2:
-        build:
-          context: ./docker/dynamo
-          args:
-            - "constraint:node==swarm-node-03"
-
+        build:   ./docker/dynamo
         environment:
           SERVICE_80_NAME: dynamo
           SERVICE_NAME: dynamo
           SERVICE_TAGS: dynamo
+           - "constraint:node==swarm-node-03"
         ports:
           - "8080"
         depends_on:
