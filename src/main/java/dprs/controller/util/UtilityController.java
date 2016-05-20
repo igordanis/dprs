@@ -60,7 +60,7 @@ public class UtilityController {
         HashMap<String, Object> data = new HashMap<>();
         for (NodeAddress address : chordService.getChordAddresses().values()) {
             URI uri = UriComponentsBuilder.fromUriString("http://" + address.getFullAddress()).path(READ_MY_DATA).build().toUri();
-            data.put(address.getIP(), new RestTemplate().getForObject(uri, List.class));
+            data.put(address.getFullAddress(), new RestTemplate().getForObject(uri, List.class));
         }
         return new ReadAllFromAllResponse(data);
     }

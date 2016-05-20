@@ -80,11 +80,15 @@ public class WriteController {
             return new RestTemplate().getForObject(destinationUri, DynamoWriteResponse.class);
         }
 
-        // Counts successful writes. (Array because needs to be final)
-        final int[] successfulUpdates = {0};
+        final String forwardedVectorClock;
+        if (receivedVectorClock == null || receivedVectorClock.equals("")) {
+            forwardedVectorClock = new VectorClock().toJSON();
+        } else {
+            forwardedVectorClock = receivedVectorClock;
+        }
 
         // Forwards write request to all nodes and collects the returned vector clocks.
-        Set<VectorClock> allVectorClocks = destinationAddresses.stream()
+        Set<DynamoWriteResponse> allResponses = destinationAddresses.stream()
                 .map(destinationAddress -> {
                     URI destinationUri = UriComponentsBuilder
                             .fromUriString("http://" + destinationAddress.getFullAddress())
@@ -92,7 +96,7 @@ public class WriteController {
                             .queryParam("key", key)
                             .queryParam("value", value)
                             .queryParam("transactionId", receivedTransactionId)
-                            .queryParam("vectorClock", receivedVectorClock)
+                            .queryParam("vectorClock", forwardedVectorClock)
                             .build()
                             .toUri();
 
@@ -100,12 +104,7 @@ public class WriteController {
 
                     // If an exception is thrown while sending request to other node, it was unsuccessful
                     try {
-                        DynamoWriteResponse response = new RestTemplate().getForObject(destinationUri, DynamoWriteResponse.class);
-                        if (response.isUpdated()) {
-                            successfulUpdates[0]++;
-                        }
-
-                        return VectorClock.fromJSON(response.getVectorClock());
+                        return new RestTemplate().getForObject(destinationUri, DynamoWriteResponse.class);
                     } catch (Exception e) {
                         logger.error(receivedTransactionId + ": Failed to send single write request to " + destinationUri);
                         return null;
@@ -113,10 +112,17 @@ public class WriteController {
                 })
                 .collect(Collectors.toSet());
 
+        Set<VectorClock> allVectorClocks = allResponses.stream().map(response
+                -> VectorClock.fromJSON(response.getVectorClock())
+        ).collect(Collectors.toSet());
+
         // Merge all collected vector clocks to one
         VectorClock mergedVectorClock = VectorClock.mergeToNewer(allVectorClocks);
 
-        return new DynamoWriteResponse(successfulUpdates[0] >= writeQuorum, mergedVectorClock.toJSON());
+        // Count successful updates
+        long countUpdates = allResponses.stream().filter(response -> response.isUpdated()).count();
+
+        return new DynamoWriteResponse(countUpdates >= writeQuorum, mergedVectorClock.toJSON());
     }
 
     @RequestMapping(WriteController.DYNAMO_SINGLE_WRITE)
@@ -124,40 +130,33 @@ public class WriteController {
             @RequestParam(value = "key") String key,
             @RequestParam(value = "value") String value,
             @RequestParam(value = "transactionId", required = true) String transactionId,
-            @RequestParam(value = "vectorClock", required = true) String vc
+            @RequestParam(value = "vectorClock", required = true) String vectorClockJson
     ) {
         InMemoryDatabase database = InMemoryDatabase.INSTANCE;
         logger.info(transactionId + ": Received request for concrete write: " + key);
 
-        // Checks if update is successful. (Array because it needs to be final)
-        final VectorClock vectorClock = VectorClock.fromJSON(vc);
-
+        final VectorClock vectorClock = VectorClock.fromJSON(vectorClockJson);
         final Integer selfIndexInChord = chordService.getSelfIndexInChord();
+        boolean successful = true;
 
-        database.computeIfPresent(key, (k, oldVal) -> {
-            if (vectorClock.isThisNewerThan(oldVal.getVectorClock())) {
-                logger.info("New value has been updated");
-                vectorClock.incrementValueForComponent(selfIndexInChord);
-                return new DatabaseEntry(value, vectorClock);
+        if (database.containsKey(key)) {
+            DatabaseEntry oldValue = database.get(key);
+
+            if (vectorClock.isNewerThan(oldValue.getVectorClock())) {
+                // Received vector clock is newer than existing
+                database.put(key, new DatabaseEntry(value, vectorClock));
             } else {
-                logger.info("Old value has been kept");
-                return oldVal;
+                // Received vector clock is older than existing
+                successful = false;
             }
-        });
+        } else {
+            // Value is saved to this node first time. Create a new vector clock with value 1.
+            vectorClock.incrementValueForComponent(selfIndexInChord);
+            database.put(key, new DatabaseEntry(value, vectorClock));
+        }
 
-        database.computeIfAbsent(key, k -> {
-            final VectorClock newVectorClock = VectorClock.fromJSON(vc);
-            newVectorClock.incrementValueForComponent(selfIndexInChord);
-            return new DatabaseEntry(value, newVectorClock);
-        });
-
-        DynamoWriteResponse response = new DynamoWriteResponse();
-        DatabaseEntry newEntry = database.get(key);
-
-        response.setUpdated(newEntry.getValue().equals(value));
-        response.setVectorClock(newEntry.getVectorClock().toJSON());
-
-        return response;
+        logger.info(transactionId + ": Single write successful: " + successful);
+        return new DynamoWriteResponse(successful, vectorClock.toJSON());
     }
 
     @RequestMapping(DYNAMO_BULK_WRITE)

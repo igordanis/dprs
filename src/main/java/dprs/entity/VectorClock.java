@@ -18,7 +18,7 @@ import static java.lang.Integer.max;
 /*
 * Neextenduje HashMap aby nebolo mozne priamo pouzivat HashMap metody
 */
-public class VectorClock {
+public class VectorClock implements Comparable<VectorClock> {
 
 
     private static final Logger logger = LoggerFactory.getLogger(VectorClock.class);
@@ -124,7 +124,6 @@ public class VectorClock {
         return countOfCommonKeys > 0;
     }
 
-
     public void incrementValueForComponent(final Integer component) {
         // ak existuje hodnota, zvysi ju o 1
         vectorClock.computeIfPresent(component, (key, oldVal) -> oldVal + 1);
@@ -139,6 +138,10 @@ public class VectorClock {
     public boolean isThisNewerThan(final VectorClock other) {
         int comparisionResult = compareTwoVectorClocks(this, other);
         return comparisionResult == FIRST_VC_IS_NEWER;
+    }
+
+    public boolean isNewerThan(VectorClock vc) {
+        return compareTo(vc) > 0;
     }
 
     public boolean isThisConcurentTo(VectorClock other) {
@@ -216,14 +219,17 @@ public class VectorClock {
          * GSON z nejakeho dovodu pridava do serializovanych stringov lomitka.
          * Preto su odstranovane
         */
-        final String replace = json.replace("\\", "");
+        String formattedJson = json.replace("\\", "");
 
-        Type typeOfHashMap = new TypeToken<Map<Integer, Integer>>() {
+        Type typeOfHashMap = new TypeToken<Map<String, Integer>>() {
         }.getType();
-        Map<Integer, Integer> deserializedMap = new Gson().fromJson(replace, typeOfHashMap);
+        Map<String, Integer> deserializedMap = new Gson().fromJson(formattedJson, typeOfHashMap);
+
+        Map<Integer, Integer> resultMap = new HashMap<>();
+        deserializedMap.keySet().forEach(key -> resultMap.put(Integer.valueOf(key), deserializedMap.get(key)));
 
         final VectorClock vectorClock = new VectorClock();
-        vectorClock.vectorClock = deserializedMap;
+        vectorClock.vectorClock = resultMap;
         return vectorClock;
     }
 
@@ -256,20 +262,47 @@ public class VectorClock {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || this.getClass() != o.getClass()) return false;
+        if (o == null || this.getClass() != o.getClass())
+            return false;
 
-        VectorClock that = (VectorClock) o;
+        VectorClock vc = (VectorClock) o;
 
-        if (vectorClock != null) {
-            final int comparisonResult = compareTwoVectorClocks(this, that);
-            return comparisonResult == VC_ARE_SAME;
-        } else
-            return that.vectorClock == null;
+        if (vectorClock != null)
+            return compareTo(vc) == 0;
+        else
+            return vc.vectorClock == null;
     }
 
     @Override
     public String toString() {
         return "VectorClock{" + vectorClock + '}';
+    }
+
+    @Override
+    public int compareTo(VectorClock vc) {
+        // VC is greater if all of its components are greater than the second one and lesser if at least one is smaller
+
+        Set<Integer> keySet = new HashSet<>(vectorClock.keySet());
+        keySet.addAll(vc.vectorClock.keySet());
+
+        boolean isLesser = false;
+        boolean isEqual = false;
+
+        for (Integer key : keySet) {
+            Integer myValue = vectorClock.getOrDefault(key, 0);
+            Integer otherValue = vc.vectorClock.getOrDefault(key, 0);
+
+            if (myValue == otherValue) {
+                isEqual = true;
+            } else if (myValue < otherValue) {
+                isLesser = true;
+            }
+        }
+
+        if (isLesser)
+            return -1;
+        if (isEqual)
+            return 0;
+        return 1;
     }
 }

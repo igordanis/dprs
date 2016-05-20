@@ -33,6 +33,9 @@ public class ChordService {
     @Value("${spring.application.name}")
     String applicationName;
 
+    @Value("${server.port}")
+    private int serverPort;
+
     private static final Logger logger = LoggerFactory.getLogger(ChordService.class);
 
     Map<Integer, NodeAddress> chordAddresses = new HashMap<>();
@@ -51,12 +54,12 @@ public class ChordService {
             NodeAddress currentPreviousAddress = getAddressInChordByOffset(-1);
 
             addedAddresses.stream().forEach(a -> {
-                logger.info("   Found new machine in chord: " + a.getIP());
+                logger.info("   Found new machine in chord: " + a.getFullAddress());
                 chordAddresses.put(a.getHash(), a);
             });
 
             removedAddresses.stream().forEach(b -> {
-                logger.info("   Found removed machine in chord: " + b.getIP());
+                logger.info("   Found removed machine in chord: " + b.getFullAddress());
                 chordAddresses.remove(b.getHash());
             });
 
@@ -141,10 +144,13 @@ public class ChordService {
         }
 
         // Find first address
-        NodeAddress firstAddress = sortedAddresses.stream().filter(a -> a.getHash() >= key.hashCode()).findFirst().get();
+        Optional<NodeAddress> firstAddressFind = sortedAddresses.stream().filter(a -> a.getHash() >= key.hashCode()).findFirst();
+        NodeAddress firstAddress;
 
-        // If first address is still null, the last address is responsible for key.
-        if (firstAddress == null) {
+        // If first address is not found by hash, the last address is responsible for key.
+        if (firstAddressFind.isPresent()) {
+            firstAddress = firstAddressFind.get();
+        } else {
             firstAddress = sortedAddresses.get(sortedAddresses.size() - 1);
         }
 
@@ -160,13 +166,13 @@ public class ChordService {
     }
 
     public Integer getSelfIndexInChord() {
-        Integer port = Integer.valueOf(environment.getProperty("local.server.port"));
+//        Integer port = Integer.valueOf(environment.getProperty("local.server.port"));
 
         Member self = consulClient.getAgentSelf()
                 .getValue()
                 .getMember();
 
-        return new NodeAddress(self.getAddress(), port).getHash();
+        return new NodeAddress(self.getAddress(), serverPort).getHash();
     }
 
     public NodeAddress getSelfAddressInChord() {
@@ -186,7 +192,7 @@ public class ChordService {
     public Map<Integer, NodeAddress> getChordAddresses() {
         return chordAddresses;
     }
-    
+
 //    public List<NodeAddress> oldFindDestinationAddressesForKey(String key, int numberOfAddresses) {
 //        Integer keyIndex = key.hashCode();
 //
