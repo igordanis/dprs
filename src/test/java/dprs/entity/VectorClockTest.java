@@ -75,17 +75,17 @@ public class VectorClockTest {
         expectedVectorClock.setValueForComponent(4, 2);
 
         assertEquals(resultingVectorClock,expectedVectorClock);
-        assertTrue(expectedVectorClock.isThisNewerThan(nonConcurentNewerVectorClock));
-        assertTrue(expectedVectorClock.isThisNewerThan(nonConcurentOlderVectorClock));
+        assertTrue(expectedVectorClock.isNewerThan(nonConcurentNewerVectorClock));
+        assertTrue(expectedVectorClock.isNewerThan(nonConcurentOlderVectorClock));
         assertNotEquals(expectedVectorClock,nonConcurentNewerVectorClock);
         assertNotEquals(expectedVectorClock,nonConcurentOlderVectorClock);
     }
 
     @Test
-    public void testNonconcurency(){
+    public void stestNonconcurency(){
         initNonconcurent();
         assertNotEquals(nonConcurentNewerVectorClock, nonConcurentOlderVectorClock);
-        assertTrue(nonConcurentNewerVectorClock.isThisNewerThan(nonConcurentOlderVectorClock));
+        assertTrue(nonConcurentNewerVectorClock.isNewerThan(nonConcurentOlderVectorClock));
     }
 
     @Test
@@ -132,7 +132,7 @@ public class VectorClockTest {
         VectorClock vc2 = new VectorClock();
         vc2.setValueForComponent(2,3);
 
-        vc1.isThisNewerThan(vc2);
+        vc1.isNewerThan(vc2);
     }
 
 }
