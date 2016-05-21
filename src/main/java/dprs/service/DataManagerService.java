@@ -33,8 +33,9 @@ public class DataManagerService {
 
     private static final Logger logger = LoggerFactory.getLogger(DataManagerService.class);
 
-    public void handleChangesInChord(Map<Integer, NodeAddress> oldChordAddresses,
-                                     Map<Integer, NodeAddress> newChordAddresses
+    public void handleChangesInChord(
+            Map<Integer, NodeAddress> oldChordAddresses,
+            Map<Integer, NodeAddress> newChordAddresses
     ) {
         if (newChordAddresses.size() == 0 || oldChordAddresses.size() == 0) {
             return;
@@ -46,106 +47,67 @@ public class DataManagerService {
         NodeAddress newPreviousAddress = chordService.getAddressInMapByOffset(newChordAddresses, -1);
 
         if (!newChordAddresses.containsKey(oldNextAddress.getHash())) {
-            // Next node failed
-            handleFailureOfNextNode(oldNextAddress, newChordAddresses, oldChordAddresses);
+            logger.info("Next node failed: " + oldNextAddress);
+            handleFailureOfNeighborNode(oldNextAddress, newChordAddresses, oldChordAddresses);
         } else if (!newNextAddress.equals(oldNextAddress)) {
-            // New next node
-            handleNewNextNode(newNextAddress, newChordAddresses);
+            logger.info("Found new next node: " + newNextAddress);
+            handleNewNeighborNode(newNextAddress, newChordAddresses, oldChordAddresses);
         }
 
         if (!newChordAddresses.containsKey(oldPreviousAddress.getHash())) {
-            // Previous node failed
-            handleFailureOfPreviousNode(oldPreviousAddress, newPreviousAddress, newChordAddresses, oldChordAddresses);
+            logger.info("Previous node failed: " + oldPreviousAddress);
+            handleFailureOfNeighborNode(oldPreviousAddress, newChordAddresses, oldChordAddresses);
         } else if (!newPreviousAddress.equals(oldPreviousAddress)) {
-            // New previous node
-            handleNewPreviousNode(newPreviousAddress, newChordAddresses);
+            logger.info("Found new previous node: " + newPreviousAddress);
+            handleNewNeighborNode(newPreviousAddress, newChordAddresses, oldChordAddresses);
         }
     }
 
-    private void handleNewNextNode(NodeAddress newNode,
-                                   Map<Integer, NodeAddress> newChordAddresses
+    /**
+     * Finds data that should be replicated on the new node and replicates it.
+     */
+    private void handleNewNeighborNode(
+            NodeAddress newNode,
+            Map<Integer, NodeAddress> newChordAddresses,
+            Map<Integer, NodeAddress> oldChordAddresses
     ) {
-        logger.info("Found new next node: " + newNode);
-
         // Find all data that should be replicated to new node
         InMemoryDatabase database = InMemoryDatabase.INSTANCE;
-        Map<String, DatabaseEntry> dataToSend = database.entrySet().stream().filter(entry ->
+        Map<String, DatabaseEntry> dataForNewNode = database.entrySet().stream().filter(entry ->
                 chordService.findDestinationAddressesForKeyInList(newChordAddresses.values(), entry.getKey(), replicationQuorum)
                         .contains(newNode)
         ).collect(Collectors.toMap(p -> p.getKey(), p -> p.getValue()));
 
-        final String transactionId = randomUUID().toString();
-        sendBulkWriteToAddress(transactionId, newNode, dataToSend);
+        filterAndSendData(dataForNewNode, newChordAddresses, oldChordAddresses);
     }
 
-    private void handleNewPreviousNode(NodeAddress newNode,
-                                       Map<Integer, NodeAddress> newChordAddresses
+    /**
+     * Finds data that used to be replicated on the failed node and re-replicates it
+     */
+    private void handleFailureOfNeighborNode(NodeAddress failedNode,
+                                             Map<Integer, NodeAddress> newChordAddresses,
+                                             Map<Integer, NodeAddress> oldChordAddresses
     ) {
-        logger.info("Found new previous node: " + newNode);
-
-        // Find all data whose master should be the new node
-        InMemoryDatabase database = InMemoryDatabase.INSTANCE;
-        Map<String, DatabaseEntry> dataToSend = database.entrySet().stream().filter(entry ->
-                chordService.findDestinationAddressesForKeyInList(newChordAddresses.values(), entry.getKey(), 1)
-                        .contains(newNode)
-        ).collect(Collectors.toMap(p -> p.getKey(), p -> p.getValue()));
-
-        final String transactionId = randomUUID().toString();
-        sendBulkWriteToAddress(transactionId, newNode, dataToSend);
-    }
-
-    private void handleFailureOfNextNode(NodeAddress failedNode,
-                                         Map<Integer, NodeAddress> newChordAddresses,
-                                         Map<Integer, NodeAddress> oldChordAddresses
-    ) {
-        logger.info("Next node failed: " + failedNode);
-
-        // Find all data that used to be replicated on the next node
+        // Find all data that used to be replicated on the failed node
         InMemoryDatabase database = InMemoryDatabase.INSTANCE;
         Map<String, DatabaseEntry> dataFromFailedNode = database.entrySet().stream().filter(entry ->
                 chordService.findDestinationAddressesForKeyInList(oldChordAddresses.values(), entry.getKey(), replicationQuorum)
                         .contains(failedNode)
         ).collect(Collectors.toMap(p -> p.getKey(), p -> p.getValue()));
 
-        // Find data that should be replicated on each of the new nodes
-        Map<NodeAddress, Map<String, DatabaseEntry>> dataToSend = getAllDataForAddresses(dataFromFailedNode, newChordAddresses);
-
-        // Send data to all addresses
-        final String transactionId = randomUUID().toString();
-        for (NodeAddress address : dataToSend.keySet()) {
-            sendBulkWriteToAddress(transactionId, address, dataToSend.get(address));
-        }
+        filterAndSendData(dataFromFailedNode, newChordAddresses, oldChordAddresses);
     }
 
-    private void handleFailureOfPreviousNode(NodeAddress failedNode,
-                                             NodeAddress newPreviousNode,
-                                             Map<Integer, NodeAddress> newChordAddresses,
-                                             Map<Integer, NodeAddress> oldChordAddresses
+    /**
+     * Creates a list of data that should be sent and sends it
+     */
+    private void filterAndSendData(
+            Map<String, DatabaseEntry> data,
+            Map<Integer, NodeAddress> newChordAddresses,
+            Map<Integer, NodeAddress> oldChordAddresses
     ) {
-        logger.info("Previous node failed: " + failedNode);
-
-        // Find all data whose master used to be the previous node
-        InMemoryDatabase database = InMemoryDatabase.INSTANCE;
-        Map<String, DatabaseEntry> dataFromFailedNode = database.entrySet().stream().filter(entry ->
-                chordService.findDestinationAddressesForKeyInList(oldChordAddresses.values(), entry.getKey(), 1)
-                        .contains(failedNode)
-        ).collect(Collectors.toMap(p -> p.getKey(), p -> p.getValue()));
-
-        // Divide the data into two parts: master is new previous node and master is current node
-        Map<String, DatabaseEntry> dataForNewPreviousNode = dataFromFailedNode.entrySet().stream().filter(entry ->
-                chordService.findDestinationAddressesForKeyInList(newChordAddresses.values(), entry.getKey(), 1)
-                        .contains(newPreviousNode)
-        ).collect(Collectors.toMap(p -> p.getKey(), p -> p.getValue()));
-
-        NodeAddress myAddress = chordService.getSelfAddressInChord();
-        Map<String, DatabaseEntry> dataForMe = dataFromFailedNode.entrySet().stream().filter(entry ->
-                chordService.findDestinationAddressesForKeyInList(newChordAddresses.values(), entry.getKey(), 1)
-                        .contains(myAddress)
-        ).collect(Collectors.toMap(p -> p.getKey(), p -> p.getValue()));
-
-        // Store data for each address in a map
-        Map<NodeAddress, Map<String, DatabaseEntry>> dataToSend = getAllDataForAddresses(dataForMe, newChordAddresses);
-        dataToSend.put(newPreviousNode, dataForNewPreviousNode);
+        // Find data that should be replicated
+        Map<NodeAddress, Map<String, DatabaseEntry>> dataToSend = getAllDataForAddresses(data, newChordAddresses, oldChordAddresses);
 
         // Send data to all addresses
         final String transactionId = randomUUID().toString();
@@ -154,9 +116,14 @@ public class DataManagerService {
         }
     }
 
-    private void sendBulkWriteToAddress(String transactionId,
-                                        NodeAddress address,
-                                        Map<String, DatabaseEntry> dataToSend) {
+    /**
+     * Transports all data to an address
+     */
+    private void sendBulkWriteToAddress(
+            String transactionId,
+            NodeAddress address,
+            Map<String, DatabaseEntry> dataToSend
+    ) {
         // If there is no data to send, don't send a request
         if (dataToSend.size() == 0) {
             return;
@@ -177,19 +144,24 @@ public class DataManagerService {
         new RestTemplate().getForObject(destinationUri, DynamoBulkWriteResponse.class);
     }
 
+    /**
+     * Creates a map: key = address, value = data to send to this address
+     */
     private Map<NodeAddress, Map<String, DatabaseEntry>> getAllDataForAddresses(
             Map<String, DatabaseEntry> data,
-            Map<Integer, NodeAddress> newChordAddresses
+            Map<Integer, NodeAddress> newChordAddresses,
+            Map<Integer, NodeAddress> oldChordAddresses
     ) {
-        // Creates a map: key = address, value = data to send to this address
-
         Map<NodeAddress, Map<String, DatabaseEntry>> dataToSend = new HashMap<>();
-        NodeAddress myAddress = chordService.getSelfAddressInChord();
 
         for (String key : data.keySet()) {
-            List<NodeAddress> addressList = chordService.findDestinationAddressesForKeyInList(newChordAddresses.values(), key, replicationQuorum);
+            List<NodeAddress> newAddressList = chordService.findDestinationAddressesForKeyInList(newChordAddresses.values(), key, replicationQuorum);
+            List<NodeAddress> oldAddressList = chordService.findDestinationAddressesForKeyInList(oldChordAddresses.values(), key, replicationQuorum);
 
-            for (NodeAddress address : addressList) {
+            // Remove nodes that already contain the data
+            newAddressList.removeAll(oldAddressList);
+
+            for (NodeAddress address : newAddressList) {
                 if (!dataToSend.containsKey(address)) {
                     dataToSend.put(address, new HashMap<>());
                 }
@@ -197,9 +169,6 @@ public class DataManagerService {
                 dataToSend.get(address).put(key, data.get(key));
             }
         }
-
-        // Remove my address from map
-        dataToSend.remove(myAddress);
 
         return dataToSend;
     }

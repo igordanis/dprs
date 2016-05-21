@@ -52,14 +52,15 @@ public class VectorClock {
     private static int SECOND_VC_IS_NEWER = -1;
     private static int VC_ARE_SAME = 0;
     private static int VC_ARE_CONCURENT = 3;
+    private static int COMPARISON_UNDEFINED = 4;
 
     private int compareTwoVectorClocks(VectorClock vc1, VectorClock vc2) {
 
-        Assert.isTrue(vectorKeysHaveCommonComponents(vc1, vc2),
-                "Vector clocks needs to have at least one common component to decide if they are " +
-                        "in fact concurent for view of its component"
-        );
-
+        if (!vectorKeysHaveCommonComponents(vc1, vc2)) {
+            logger.warn("Vector clocks needs to have at least one common component to decide if they are " +
+                    "in fact concurent for view of its component");
+            return COMPARISON_UNDEFINED;
+        }
 
         final Set<Integer> uniqVectorClockKeys = new HashSet<>();
 
