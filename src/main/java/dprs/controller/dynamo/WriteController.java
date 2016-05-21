@@ -80,6 +80,7 @@ public class WriteController {
             return new RestTemplate().getForObject(destinationUri, DynamoWriteResponse.class);
         }
 
+        // If received vector clock is empty, create a new one.
         final String forwardedVectorClock;
         if (receivedVectorClock == null || receivedVectorClock.equals("")) {
             forwardedVectorClock = new VectorClock().toJSON();
@@ -121,8 +122,9 @@ public class WriteController {
 
         // Count successful updates
         long countUpdates = allResponses.stream().filter(response -> response.isUpdated()).count();
+        boolean successful = countUpdates >= writeQuorum || countUpdates >= chordService.getChordCount();
 
-        return new DynamoWriteResponse(countUpdates >= writeQuorum, mergedVectorClock.toJSON());
+        return new DynamoWriteResponse(successful, mergedVectorClock.toJSON());
     }
 
     @RequestMapping(WriteController.DYNAMO_SINGLE_WRITE)
@@ -143,16 +145,25 @@ public class WriteController {
             DatabaseEntry oldValue = database.get(key);
 
             if (vectorClock.isNewerThan(oldValue.getVectorClock())) {
-                // Received vector clock is newer than existing. Combine them and save.
+                // Received vector clock is newer than existing. Combine them.
                 vectorClock.addDisjunctiveValuesFrom(oldValue.getVectorClock());
+
+                // If vector clock does not have value for current component, save it.
+                if (!vectorClock.containsValueForComponent(selfIndexInChord)) {
+                    vectorClock.setValueForComponent(selfIndexInChord, 1);
+                }
+
                 database.put(key, new DatabaseEntry(value, vectorClock));
             } else {
                 // Received vector clock is older than existing
                 successful = false;
             }
         } else {
-            // Value is saved to this node first time. Create a new vector clock with value 1.
-            vectorClock.incrementValueForComponent(selfIndexInChord);
+            // When value is saved to this node for the first time, insert value for this node.
+            if (!vectorClock.containsValueForComponent(selfIndexInChord)) {
+                vectorClock.setValueForComponent(selfIndexInChord, 1);
+            }
+
             database.put(key, new DatabaseEntry(value, vectorClock));
         }
 
@@ -161,16 +172,29 @@ public class WriteController {
     }
 
     @RequestMapping(DYNAMO_BULK_WRITE)
-    public TransportDataResponse bulkWrite(@RequestParam(value = "data") String data) {
+    public TransportDataResponse bulkWrite(
+            @RequestParam(value = "data") String data,
+            @RequestParam(value = "transactionId") String transactionId
+    ) {
+        logger.info(transactionId + ": Received bulk write with data: " + data);
         InMemoryDatabase database = InMemoryDatabase.INSTANCE;
 
         HashMap<String, DatabaseEntry> dataMap = new Gson()
                 .fromJson(data, new TypeToken<HashMap<String, DatabaseEntry>>() {
                 }.getType());
 
-        logger.info("Received data: " + data);
-        database.putAll(dataMap);
+        // Store data that I don't have or is newer than my data
+        dataMap.entrySet().stream().forEach(entry -> {
+            DatabaseEntry value = entry.getValue();
+            String key = entry.getKey();
+
+            if (!database.containsKey(key) ||
+                    value.getVectorClock().isNewerThan(database.get(key).getVectorClock())
+                    ) {
+                database.put(entry.getKey(), entry.getValue());
+            }
+        });
+
         return new TransportDataResponse(true);
     }
-
 }
