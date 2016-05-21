@@ -5,9 +5,6 @@ import dprs.entity.DatabaseEntry;
 import dprs.entity.NodeAddress;
 import dprs.response.util.ReadAllFromAllResponse;
 import dprs.service.ChordService;
-import dprs.wthrash.AllDataResponse;
-import dprs.wthrash.BackupService;
-import dprs.wthrash.GetAddressRangesResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,6 +31,7 @@ public class UtilityController {
     public static final String READ_ALL_DATA = "/readAllData";
     public static final String READ_MY_DATA = "/readMyData";
     public static final String ALL_ADDRESSES = "/allAddresses";
+    public static final String PRINT_CHORD_STATE = "/printChordState";
 
     @Autowired
     ChordService chordService;
@@ -76,5 +74,18 @@ public class UtilityController {
         return database.keySet().stream().map(key ->
                 key + ":" + database.get(key))
                 .collect(Collectors.toList());
+    }
+
+    @RequestMapping(PRINT_CHORD_STATE)
+    public List<NodeAddress> printChordState() {
+        // Prints the current positions of nodes in a chord (starting with my node).
+
+        int count = chordService.getChordCount();
+        List<NodeAddress> addressList = new ArrayList<>();
+
+        for (int i = 0; i < count; i++) {
+            addressList.add(chordService.getAddressInChordByOffset(i));
+        }
+        return addressList;
     }
 }

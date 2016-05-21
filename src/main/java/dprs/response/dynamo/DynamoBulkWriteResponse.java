@@ -1,10 +1,12 @@
-package dprs.wthrash;
+package dprs.response.dynamo;
 
-public class TransportDataResponse {
+public class DynamoBulkWriteResponse {
 
     boolean successful;
 
-    public TransportDataResponse(boolean successful) {
+    public DynamoBulkWriteResponse() {}
+
+    public DynamoBulkWriteResponse(boolean successful) {
         this.successful = successful;
     }
 

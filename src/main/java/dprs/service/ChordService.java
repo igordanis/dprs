@@ -28,7 +28,7 @@ public class ChordService {
     ConsulClient consulClient;
 
     @Autowired
-    Environment environment;
+    DataManagerService dataManagerService;
 
     @Value("${spring.application.name}")
     String applicationName;
@@ -48,40 +48,19 @@ public class ChordService {
         if (chordChanged(catalogServiceList)) {
             logger.info("Found changes in chord: ");
 
-            List<NodeAddress> addedAddresses = addedAddresses(catalogServiceList);
-            List<NodeAddress> removedAddresses = removedAdresses(catalogServiceList);
-            NodeAddress currentNextAddress = getAddressInChordByOffset(1);
-            NodeAddress currentPreviousAddress = getAddressInChordByOffset(-1);
+            final HashMap<Integer, NodeAddress> oldChordAddresses = new HashMap<>(chordAddresses);
 
-            addedAddresses.stream().forEach(a -> {
-                logger.info("   Found new machine in chord: " + a.getFullAddress());
-                chordAddresses.put(a.getHash(), a);
+            addedAddresses(catalogServiceList).stream().forEach(address -> {
+                logger.info("   Found new machine in chord: " + address.getFullAddress());
+                chordAddresses.put(address.getHash(), address);
             });
 
-            removedAddresses.stream().forEach(b -> {
-                logger.info("   Found removed machine in chord: " + b.getFullAddress());
-                chordAddresses.remove(b.getHash());
+            removedAdresses(catalogServiceList).stream().forEach(address -> {
+                logger.info("   Found removed machine in chord: " + address.getFullAddress());
+                chordAddresses.remove(address.getHash());
             });
 
-            if (currentNextAddress != null) {
-                if (removedAddresses.contains(currentNextAddress)) {
-                    // Handle failure of next node
-                    logger.info("Failure of next node.");
-                } else if (!currentNextAddress.equals(getAddressInChordByOffset(1))) {
-                    // Handle new next node
-                    logger.info("New next node.");
-                }
-            }
-
-            if (currentPreviousAddress != null) {
-                if (removedAddresses.contains(currentPreviousAddress)) {
-                    // Handle failure of previous node
-                    logger.info("Failure of previous node.");
-                } else if (!currentPreviousAddress.equals(getAddressInChordByOffset(-1))) {
-                    // Handle new previous node
-                    logger.info("New previous node.");
-                }
-            }
+            dataManagerService.handleChangesInChord(oldChordAddresses, chordAddresses);
 
             logger.info("Current machines in chord: " + chordAddresses.values().stream()
                     .map(a -> a.getHash() + " - " + a.getIP() + ":" + a.getPort())
@@ -91,8 +70,6 @@ public class ChordService {
     }
 
     private boolean chordChanged(List<CatalogService> catalogServiceList) {
-        boolean changed = false;
-
         // nieco sa pridalo alebo ubralo
         if (catalogServiceList.size() != chordAddresses.size())
             return true;
@@ -104,7 +81,6 @@ public class ChordService {
 
         return false;
     }
-
 
     private List<NodeAddress> addedAddresses(List<CatalogService> catalogServiceList) {
         final List<NodeAddress> listOfAdditions = catalogServiceList.stream()
@@ -158,9 +134,9 @@ public class ChordService {
 
         // Collect #numbeOfAddresses addresses starting with first address (with overflow)
         List<NodeAddress> resultAddresses = IntStream.range(0, numberOfAddresses).mapToObj(i -> {
-            int targetIndex = (firstAddressIndex + i) % chordAddresses.size();
+            int targetIndex = (firstAddressIndex + i) % addressList.size();
             return sortedAddresses.get(targetIndex);
-        }).collect(Collectors.<NodeAddress>toList());
+        }).collect(Collectors.toList());
 
         return resultAddresses;
     }
@@ -180,18 +156,29 @@ public class ChordService {
     }
 
     public NodeAddress getAddressInChordByOffset(int offset) {
-        if (chordAddresses.size() == 0) {
+        return getAddressInMapByOffset(chordAddresses, offset);
+    }
+
+    public NodeAddress getAddressInMapByOffset(Map<Integer, NodeAddress> addressMap, int offset) {
+        if (addressMap.size() == 0) {
             return null;
         }
 
-        int myIndex = getSelfIndexInChord();
-        int targetAddressIndex = (myIndex + offset + chordAddresses.size()) % chordAddresses.size();
-        return chordAddresses.get(targetAddressIndex);
+        NodeAddress myAddress = getSelfAddressInChord();
+        List<NodeAddress> addressList = new ArrayList<>(addressMap.values());
+        Collections.sort(addressList);
+
+        int myIndex = addressList.indexOf(myAddress);
+        int targetAddressIndex = (myIndex + offset + addressList.size()) % addressList.size();
+
+        return addressList.get(targetAddressIndex);
     }
 
     public Map<Integer, NodeAddress> getChordAddresses() {
         return chordAddresses;
     }
+
+    public int getChordCount() { return chordAddresses.size(); }
 
 //    public List<NodeAddress> oldFindDestinationAddressesForKey(String key, int numberOfAddresses) {
 //        Integer keyIndex = key.hashCode();

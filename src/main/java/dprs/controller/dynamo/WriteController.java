@@ -9,7 +9,7 @@ import dprs.entity.VectorClock;
 import dprs.response.dynamo.DynamoWriteResponse;
 import dprs.service.ChordService;
 import dprs.service.DataManagerService;
-import dprs.wthrash.TransportDataResponse;
+import dprs.response.dynamo.DynamoBulkWriteResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -62,8 +62,7 @@ public class WriteController {
         final String receivedTransactionId = transactionId != null ? transactionId : randomUUID().toString();
 
         // Find part of chord which manages given key
-        List<NodeAddress> destinationAddresses = chordService.findDestinationAddressesForKeyInChord(
-                key, replicationQuorum);
+        List<NodeAddress> destinationAddresses = chordService.findDestinationAddressesForKeyInChord(key, replicationQuorum);
 
         // If not coordinator for key, forward to it
         if (!destinationAddresses.get(0).equals(chordService.getSelfAddressInChord())) {
@@ -163,16 +162,18 @@ public class WriteController {
             if (!vectorClock.containsValueForComponent(selfIndexInChord)) {
                 vectorClock.setValueForComponent(selfIndexInChord, 1);
             }
-
             database.put(key, new DatabaseEntry(value, vectorClock));
         }
+
+        // Final merge of vector clocks (if this node has values that the sent vector clock doesnt have)
+        vectorClock.addDisjunctiveValuesFrom(database.get(key).getVectorClock());
 
         logger.info(transactionId + ": Single write successful: " + successful);
         return new DynamoWriteResponse(successful, vectorClock.toJSON());
     }
 
     @RequestMapping(DYNAMO_BULK_WRITE)
-    public TransportDataResponse bulkWrite(
+    public DynamoBulkWriteResponse bulkWrite(
             @RequestParam(value = "data") String data,
             @RequestParam(value = "transactionId") String transactionId
     ) {
@@ -195,6 +196,6 @@ public class WriteController {
             }
         });
 
-        return new TransportDataResponse(true);
+        return new DynamoBulkWriteResponse(true);
     }
 }
