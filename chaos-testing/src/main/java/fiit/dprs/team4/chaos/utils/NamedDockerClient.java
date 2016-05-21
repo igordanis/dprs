@@ -1,4 +1,4 @@
-package fiit.dprs.team4.utils;
+package fiit.dprs.team4.chaos.utils;
 
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.DockerException;

@@ -1,7 +1,7 @@
-package fiit.dprs.team4.killCommand;
+package fiit.dprs.team4.chaos.killCommand;
 
 import com.github.dockerjava.api.model.Container;
-import fiit.dprs.team4.utils.NamedDockerClient;
+import fiit.dprs.team4.chaos.utils.NamedDockerClient;
 import org.javatuples.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

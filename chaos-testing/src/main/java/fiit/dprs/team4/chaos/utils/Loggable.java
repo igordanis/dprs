@@ -1,4 +1,4 @@
-package fiit.dprs.team4.utils;
+package fiit.dprs.team4.chaos.utils;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

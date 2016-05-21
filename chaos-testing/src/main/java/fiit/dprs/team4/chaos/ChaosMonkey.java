@@ -1,10 +1,9 @@
-package fiit.dprs.team4;
+package fiit.dprs.team4.chaos;
 
 
-import fiit.dprs.team4.killCommand.KillRandomContainerOnRandomNode;
-import fiit.dprs.team4.utils.Loggable;
+import fiit.dprs.team4.chaos.killCommand.KillRandomContainerOnRandomNode;
+import fiit.dprs.team4.chaos.utils.Loggable;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.util.concurrent.ThreadLocalRandom;
@@ -14,10 +13,10 @@ import java.util.concurrent.ThreadLocalRandom;
 public class ChaosMonkey implements Loggable{
 
     @Autowired
-    DynamoCluster dynamoCluster = new DynamoCluster();
+    DynamoCluster dynamoCluster;
 
 
-    @Scheduled(fixedDelay = 10000)
+//    @Scheduled(fixedDelay = 10000)
     public void scheduledRequest() {
         final int randomTest = ThreadLocalRandom.current().nextInt(1,2);
 

@@ -1,8 +1,8 @@
-package fiit.dprs.team4.killCommand;
+package fiit.dprs.team4.chaos.killCommand;
 
 import com.github.dockerjava.api.model.Container;
-import fiit.dprs.team4.utils.Loggable;
-import fiit.dprs.team4.utils.NamedDockerClient;
+import fiit.dprs.team4.chaos.utils.Loggable;
+import fiit.dprs.team4.chaos.utils.NamedDockerClient;
 import org.javatuples.Pair;
 
 import java.util.Set;
@@ -10,7 +10,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 
-public class KillAllContainersOnSingleNode extends AbstractKillCommand implements Loggable{
+public class KillAllContainersOnSingleNode extends AbstractKillCommand implements Loggable {
 
     public KillAllContainersOnSingleNode(Set<Pair<NamedDockerClient, Container>>
                                                  containersInNodes) {
