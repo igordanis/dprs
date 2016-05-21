@@ -81,7 +81,7 @@ public class VectorClockTest {
     }
 
     @Test
-    public void stestNonconcurency(){
+    public void testNonconcurency(){
         initNonconcurent();
         assertNotEquals(nonConcurentNewerVectorClock, nonConcurentOlderVectorClock);
         assertTrue(nonConcurentNewerVectorClock.isThisNewerThan(nonConcurentOlderVectorClock));
@@ -123,15 +123,15 @@ public class VectorClockTest {
     }
 
 
-    @Test(expected = IllegalArgumentException.class)
-    public void testAssertion(){
+    @Test
+    public void testConflictedComparison(){
         VectorClock vc1 = new VectorClock();
         vc1.setValueForComponent(1, 4);
 
         VectorClock vc2 = new VectorClock();
         vc2.setValueForComponent(2,3);
 
-        vc1.isThisNewerThan(vc2);
+        assert !vc1.isThisNewerThan(vc2);
     }
 
 }
