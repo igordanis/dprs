@@ -35,19 +35,17 @@
 			<scope>test</scope>
 		</dependency>
 
-
 		<dependency>
 			<groupId>com.github.docker-java</groupId>
 			<artifactId>docker-java</artifactId>
 			<version>2.2.3</version>
 		</dependency>
 
-		<!--<dependency>-->
-			<!--<groupId>com.spotify</groupId>-->
-			<!--<artifactId>docker-client</artifactId>-->
-			<!--<version>3.5.12</version>-->
-		<!--</dependency>-->
-
+		<dependency>
+			<groupId>org.javatuples</groupId>
+			<artifactId>javatuples</artifactId>
+			<version>1.2</version>
+		</dependency>
 
 	</dependencies>
 	
