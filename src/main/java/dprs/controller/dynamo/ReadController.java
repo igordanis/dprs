@@ -5,6 +5,7 @@ import dprs.entity.DatabaseEntry;
 import dprs.entity.NodeAddress;
 import dprs.entity.VectorClock;
 import dprs.response.dynamo.DynamoReadResponse;
+import dprs.response.dynamo.ReadResponse;
 import dprs.response.util.ReadAllFromSelfResponse;
 import dprs.util.Tuple;
 import dprs.service.ChordService;
@@ -37,7 +38,7 @@ public class ReadController {
     ChordService chordService;
 
     @RequestMapping(ReadController.READ)
-    public ReadAllFromSelfResponse read(
+    public ReadResponse read(
             @RequestParam(value = "key") String key,
             @RequestParam(value = "readQuorum", required = true) Integer readQuorum
     ) {
@@ -72,23 +73,24 @@ public class ReadController {
                 })
                 .collect(Collectors.toSet());
 
-        HashMap<VectorClock, DynamoReadResponse> uniqueValuesByVectorClock = new HashMap();
-        allResponses.stream()
-                .forEach(resp -> uniqueValuesByVectorClock.put(
-                        VectorClock.fromJSON(resp.getVectorClock()), resp)
-                );
 
-        List<Tuple> uniqValues = uniqueValuesByVectorClock.values().stream()
-                .distinct()
-                .map(uniqueResponse -> {
-                    final Tuple tuple = new Tuple();
-                    tuple.setValue(uniqueResponse.getValue());
-                    tuple.setVectorClock(uniqueResponse.getVectorClock());
-                    return tuple;
-                })
-                .collect(Collectors.toList());
+        /*
+         * After all responses has been collected, constructs one final response
+         * for client
+         */
 
-        return new ReadAllFromSelfResponse(uniqValues);
+        Set<VectorClock> allVectorClocks = allResponses.stream()
+                .map(dynamoReadResponse -> VectorClock.fromJSON(dynamoReadResponse.getVectorClock()))
+                .collect(Collectors.toSet());
+        String nextVectorClockToken = VectorClock.mergeToNewer(allVectorClocks).toJSON();
+
+
+        Set<String> uniqValues = allResponses.stream()
+                .map(dynamoReadResponse -> dynamoReadResponse.getValue())
+                .collect(Collectors.toSet());
+
+        return new ReadResponse(nextVectorClockToken, uniqValues);
+
     }
 
 

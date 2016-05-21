@@ -2,7 +2,6 @@ package dprs.entity;
 
 import org.junit.Test;
 
-import javax.validation.constraints.AssertTrue;
 import java.util.HashSet;
 
 import static dprs.entity.VectorClock.fromJSON;
@@ -75,8 +74,8 @@ public class VectorClockTest {
         expectedVectorClock.setValueForComponent(4, 2);
 
         assertEquals(resultingVectorClock,expectedVectorClock);
-        assertTrue(expectedVectorClock.isNewerThan(nonConcurentNewerVectorClock));
-        assertTrue(expectedVectorClock.isNewerThan(nonConcurentOlderVectorClock));
+        assertTrue(expectedVectorClock.isThisNewerThan(nonConcurentNewerVectorClock));
+        assertTrue(expectedVectorClock.isThisNewerThan(nonConcurentOlderVectorClock));
         assertNotEquals(expectedVectorClock,nonConcurentNewerVectorClock);
         assertNotEquals(expectedVectorClock,nonConcurentOlderVectorClock);
     }
@@ -85,7 +84,7 @@ public class VectorClockTest {
     public void stestNonconcurency(){
         initNonconcurent();
         assertNotEquals(nonConcurentNewerVectorClock, nonConcurentOlderVectorClock);
-        assertTrue(nonConcurentNewerVectorClock.isNewerThan(nonConcurentOlderVectorClock));
+        assertTrue(nonConcurentNewerVectorClock.isThisNewerThan(nonConcurentOlderVectorClock));
     }
 
     @Test
@@ -132,7 +131,7 @@ public class VectorClockTest {
         VectorClock vc2 = new VectorClock();
         vc2.setValueForComponent(2,3);
 
-        vc1.isNewerThan(vc2);
+        vc1.isThisNewerThan(vc2);
     }
 
 }

@@ -47,6 +47,12 @@
 			<version>1.2</version>
 		</dependency>
 
+		<dependency>
+			<groupId>fiit.dprs.teamOf4</groupId>
+			<artifactId>dprs</artifactId>
+			<version>0.0.1</version>
+		</dependency>
+
 	</dependencies>
 	
 	<build>

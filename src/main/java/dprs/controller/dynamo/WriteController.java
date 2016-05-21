@@ -143,7 +143,7 @@ public class WriteController {
         if (database.containsKey(key)) {
             DatabaseEntry oldValue = database.get(key);
 
-            if (vectorClock.isNewerThan(oldValue.getVectorClock())) {
+            if (vectorClock.isThisNewerThan(oldValue.getVectorClock())) {
                 // Received vector clock is newer than existing. Combine them.
                 vectorClock.addDisjunctiveValuesFrom(oldValue.getVectorClock());
 
@@ -190,7 +190,7 @@ public class WriteController {
             String key = entry.getKey();
 
             if (!database.containsKey(key) ||
-                    value.getVectorClock().isNewerThan(database.get(key).getVectorClock())
+                    value.getVectorClock().isThisNewerThan(database.get(key).getVectorClock())
                     ) {
                 database.put(entry.getKey(), entry.getValue());
             }

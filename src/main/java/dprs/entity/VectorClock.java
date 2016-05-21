@@ -151,7 +151,7 @@ public class VectorClock {
     /*
      *
      */
-    public boolean isNewerThan(final VectorClock other) {
+    public boolean isThisNewerThan(final VectorClock other) {
         int comparisionResult = compareTwoVectorClocks(this, other);
         return comparisionResult == FIRST_VC_IS_NEWER;
     }

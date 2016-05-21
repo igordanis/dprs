@@ -36,33 +36,27 @@ services:
     dynamo:
         build:  ./docker/dynamo
         environment:
-          SERVICE_80_NAME: dynamo
-          SERVICE_NAME: dynamo
-          SERVICE_TAGS: dynamo
            - "constraint:node==swarm-node-02"
         ports:
           - "8080"
         depends_on:
           - consulserver
-          - logstash
+#          - logstash
 
     dynamo2:
         build:   ./docker/dynamo
         environment:
-          SERVICE_80_NAME: dynamo
-          SERVICE_NAME: dynamo
-          SERVICE_TAGS: dynamo
            - "constraint:node==swarm-node-03"
         ports:
           - "8080"
         depends_on:
           - consulserver
-          - logstash
+#          - logstash
 
 
     # Run only once
     consulserver:
-        image: gliderlabs/consul-server:latest
+        build: ./docker/consul
         container_name: consulserver
         hostname: consulserver
         ports:
@@ -71,10 +65,9 @@ services:
            - "8400"
            - "8500"
            - "53"
-        volumes:
-           - ./docker/consul:/tmp/consul2
         entrypoint:
            - /tmp/consul2/entrypoint.sh
+
 
 
     # Run only once - access application through ip address of this docker-machine (ip:8080)
@@ -87,32 +80,32 @@ services:
         depends_on:
           - consulserver
 
-    elasticsearch:
-      image: elasticsearch:latest
-      command: elasticsearch -Des.network.host=0.0.0.0
-      ports:
-        - "9200:9200"
-        - "9300:9300"
-
-
-    logstash:
-      image: logstash:latest
-      command: logstash -f /etc/logstash/conf.d/logstash.conf
-      volumes:
-        - ./docker/logstash/config:/etc/logstash/conf.d
-      ports:
-        - "5000:5000"
-      environment:
-        - LS_HEAP_SIZE=256m
-      depends_on:
-       - elasticsearch
-
-    kibana:
-      build: ./docker/kibana/
-      volumes:
-        - ./docker/kibana/config/:/opt/kibana/config/
-      ports:
-        - "5601:5601"
-      depends_on:
-       - elasticsearch
+#    elasticsearch:
+#      image: elasticsearch:latest
+#      command: elasticsearch -Des.network.host=0.0.0.0
+#      ports:
+#        - "9200:9200"
+#        - "9300:9300"
+#
+#
+#    logstash:
+#      image: logstash:latest
+#      command: logstash -f /etc/logstash/conf.d/logstash.conf
+#      volumes:
+#        - ./docker/logstash/config:/etc/logstash/conf.d
+#      ports:
+#        - "5000:5000"
+#      environment:
+#        - LS_HEAP_SIZE=64m
+#      depends_on:
+#       - elasticsearch
+#
+#    kibana:
+#      build: ./docker/kibana/
+#      volumes:
+#        - ./docker/kibana/config/:/opt/kibana/config/
+#      ports:
+#        - "5601:5601"
+#      depends_on:
+#       - elasticsearch
 
