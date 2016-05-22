@@ -148,6 +148,12 @@ public class VectorClock {
         vectorClock.computeIfAbsent(component, c -> 1);
     }
 
+    public void decrementValueForComponent(final Integer component) {
+        // ak existuje hodnota, znizi ju o 1
+        vectorClock.computeIfPresent(component, (key, oldVal) -> oldVal - 1);
+        // ak neexistuje ignorujeme
+    }
+
 
     /*
      *
@@ -317,6 +323,19 @@ public class VectorClock {
             return comparisonResult == VC_ARE_SAME;
         } else
             return that.vectorClock == null;
+    }
+
+    public VectorClock clone(){
+        VectorClock clonedVectorClock = new VectorClock();
+
+        this.vectorClock.entrySet().forEach(integerIntegerEntry -> {
+            Integer newKey = new Integer(integerIntegerEntry.getKey().intValue());
+            Integer newVal = new Integer(integerIntegerEntry.getValue().intValue());
+
+            clonedVectorClock.vectorClock.put(newKey, newVal);
+        });
+
+        return clonedVectorClock;
     }
 
 }

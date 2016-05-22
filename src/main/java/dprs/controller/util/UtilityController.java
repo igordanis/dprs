@@ -37,7 +37,8 @@ public class UtilityController {
     ChordService chordService;
 
     @RequestMapping(CLEAR_DATA)
-    public void clearData(@RequestParam(value = "redirected", defaultValue = "false") boolean redirected) {
+    public void clearData(@RequestParam(value = "redirected", defaultValue = "false") boolean
+                                   redirected) {
         InMemoryDatabase database = InMemoryDatabase.INSTANCE;
         final ConcurrentHashMap.KeySetView<String, DatabaseEntry> keySet = database.keySet();
         keySet.forEach(database::remove);

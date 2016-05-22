@@ -23,6 +23,7 @@ import java.net.URI;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static dprs.response.util.TimeoutedRest.getTimeoutedRestTemplate;
 import static java.util.UUID.randomUUID;
 
 @EnableAutoConfiguration
@@ -67,12 +68,13 @@ public class ReadController {
                     logger.info(transactionId + ": Forwarding read request to: " + destinationUri);
 
                     try {
-                        return new RestTemplate().getForObject(destinationUri, DynamoReadResponse.class);
+                        return getTimeoutedRestTemplate().getForObject(destinationUri, DynamoReadResponse.class);
                     } catch (Exception e) {
                         logger.error(transactionId + ": Failed to retrieve read response from " + destinationUri);
                         return null;
                     }
                 })
+                .filter(dynamoReadResponse -> dynamoReadResponse != null)
                 .collect(Collectors.toSet());
 
 

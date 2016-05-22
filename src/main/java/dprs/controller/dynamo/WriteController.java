@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static dprs.response.util.TimeoutedRest.getTimeoutedRestTemplate;
 import static java.util.UUID.randomUUID;
 
 //import dprs.wthrash.BackupService;
@@ -104,12 +105,13 @@ public class WriteController {
 
                     // If an exception is thrown while sending request to other node, it was unsuccessful
                     try {
-                        return new RestTemplate().getForObject(destinationUri, DynamoWriteResponse.class);
+                        return getTimeoutedRestTemplate().getForObject(destinationUri, DynamoWriteResponse.class);
                     } catch (Exception e) {
                         logger.error(receivedTransactionId + ": Failed to send single write request to " + destinationUri);
                         return null;
                     }
                 })
+                .filter(dynamoWriteResponse -> dynamoWriteResponse != null)
                 .collect(Collectors.toSet());
 
         Set<VectorClock> allVectorClocks = allResponses.stream().map(response

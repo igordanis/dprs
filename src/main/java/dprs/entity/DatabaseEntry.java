@@ -11,14 +11,6 @@ public class DatabaseEntry {
     }
 
 
-    public DatabaseEntry(Integer value, VectorClock vectorClock,
-                         Integer maxBackups, Integer currentBackup) {
-        this.value = value.toString();
-        this.vectorClock = vectorClock;
-//        this.maxBackups = maxBackups;
-//        this.currentBackup = currentBackup;
-    }
-
     public DatabaseEntry(DatabaseEntry source) {
         this.value = source.value;
         this.vectorClock = source.vectorClock;
@@ -72,8 +64,4 @@ public class DatabaseEntry {
                 '}';
     }
 
-
-
-//    Integer maxBackups;
-//    Integer currentBackup;
 }
