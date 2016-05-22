@@ -166,10 +166,11 @@ public class WriteController {
         }
 
         // Final merge of vector clocks (if this node has values that the sent vector clock doesnt have)
-        vectorClock.addDisjunctiveValuesFrom(database.get(key).getVectorClock());
+        VectorClock responseVectorClock = database.get(key).getVectorClock();
+        responseVectorClock.addDisjunctiveValuesFrom(vectorClock);
 
         logger.info(transactionId + ": Single write successful: " + successful);
-        return new DynamoWriteResponse(successful, vectorClock.toJSON());
+        return new DynamoWriteResponse(successful, responseVectorClock.toJSON());
     }
 
     @RequestMapping(DYNAMO_BULK_WRITE)

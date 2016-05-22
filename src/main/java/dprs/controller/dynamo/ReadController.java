@@ -64,12 +64,14 @@ public class ReadController {
                             .build()
                             .toUri();
 
-                    logger.info(transactionId, "Forwarding read request to: "
-                            + destinationUri);
+                    logger.info(transactionId + ": Forwarding read request to: " + destinationUri);
 
-                    return new RestTemplate()
-                            .getForObject(destinationUri, DynamoReadResponse.class);
-
+                    try {
+                        return new RestTemplate().getForObject(destinationUri, DynamoReadResponse.class);
+                    } catch (Exception e) {
+                        logger.error(transactionId + ": Failed to retrieve read response from " + destinationUri);
+                        return null;
+                    }
                 })
                 .collect(Collectors.toSet());
 
@@ -89,7 +91,10 @@ public class ReadController {
                 .map(dynamoReadResponse -> dynamoReadResponse.getValue())
                 .collect(Collectors.toSet());
 
-        return new ReadResponse(nextVectorClockToken, uniqValues);
+        long countSuccessfulResponses = allResponses.stream().filter(response -> response.isSuccessful()).count();
+        boolean successful = countSuccessfulResponses >= readQuorum || countSuccessfulResponses >= chordService.getChordCount();
+
+        return new ReadResponse(nextVectorClockToken, uniqValues, successful);
 
     }
 
@@ -105,14 +110,15 @@ public class ReadController {
         final DynamoReadResponse dynamoReadResponse = new DynamoReadResponse();
 
         if(databaseEntry == null){
-            logger.info(transactionId + ": Database doesnt contain any value for requested key: " +
-                    key);
-            return dynamoReadResponse;
+            logger.info(transactionId + ": Database doesnt contain any value for requested key: " + key);
+            dynamoReadResponse.setSuccessful(false);
         } else {
             dynamoReadResponse.setKey(key);
             dynamoReadResponse.setValue(databaseEntry.getValue());
             dynamoReadResponse.setVectorClock(databaseEntry.getVectorClock().toJSON());
+            dynamoReadResponse.setSuccessful(true);
         }
+
         return dynamoReadResponse;
     }
 
