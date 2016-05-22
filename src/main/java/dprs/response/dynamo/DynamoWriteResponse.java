@@ -1,29 +1,26 @@
 package dprs.response.dynamo;
 
-import dprs.entity.VectorClock;
-
 
 public class DynamoWriteResponse {
 
-    boolean updated = false;
+    boolean successful = false;
     String vectorClock;
 
     public DynamoWriteResponse(){
     }
 
-    public DynamoWriteResponse(boolean updated, String vectorClock){
-        this.updated = updated;
+    public DynamoWriteResponse(boolean successful, String vectorClock){
+        this.successful = successful;
         this.vectorClock = vectorClock;
     }
 
-    public boolean isUpdated() {
-        return this.updated;
+    public boolean isSuccessful() {
+        return this.successful;
     }
 
-    public void setUpdated(boolean updated) {
-        this.updated = updated;
+    public void setSuccessful(boolean successful) {
+        this.successful = successful;
     }
-
 
     public String getVectorClock() {
         return this.vectorClock;
@@ -32,33 +29,5 @@ public class DynamoWriteResponse {
     public void setVectorClock(String vectorClock) {
         this.vectorClock = vectorClock;
     }
-
-
-//    String key;
-//    VectorClock vectorClock;
-//    Object value;
-//    public String getKey() {
-//        return this.key;
-//    }
-//
-//    public void setKey(String key) {
-//        this.key = key;
-//    }
-//
-//    public VectorClock getVectorClock() {
-//        return this.vectorClock;
-//    }
-//
-//    public void setVectorClock(VectorClock vectorClock) {
-//        this.vectorClock = vectorClock;
-//    }
-//
-//    public Object getValue() {
-//        return this.value;
-//    }
-//
-//    public void setValue(Object value) {
-//        this.value = value;
-//    }
 
 }

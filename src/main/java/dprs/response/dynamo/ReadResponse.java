@@ -1,8 +1,5 @@
 package dprs.response.dynamo;
 
-import dprs.entity.VectorClock;
-import dprs.util.Tuple;
-
 import java.util.Set;
 
 /**
@@ -12,15 +9,24 @@ public class ReadResponse {
 
     public String nextVectorClockToken;
     public Set<String> uniqValues;
+    public boolean successful;
 
     public ReadResponse() {
     }
 
-    public ReadResponse(String nextVectorClockToken, Set<String> uniqValues) {
+    public ReadResponse(String nextVectorClockToken, Set<String> uniqValues, boolean successful) {
         this.nextVectorClockToken = nextVectorClockToken;
         this.uniqValues = uniqValues;
+        this.successful = successful;
     }
 
+    public boolean isSuccessful() {
+        return successful;
+    }
+
+    public void setSuccessful(boolean successful) {
+        this.successful = successful;
+    }
 
     public String getNextVectorClockToken() {
         return this.nextVectorClockToken;

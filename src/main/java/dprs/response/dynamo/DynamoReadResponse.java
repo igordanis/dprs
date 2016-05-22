@@ -1,18 +1,23 @@
 package dprs.response.dynamo;
 
-import dprs.entity.VectorClock;
-import dprs.exceptions.ReadException;
-
-import java.util.ArrayList;
-import java.util.Objects;
-
-
-public class DynamoReadResponse{
+public class DynamoReadResponse {
 
     String key;
     String vectorClock;
     String value;
+    boolean successful;
 
+    public DynamoReadResponse() {
+        successful = false;
+    }
+
+    public boolean isSuccessful() {
+        return successful;
+    }
+
+    public void setSuccessful(boolean successful) {
+        this.successful = successful;
+    }
 
     public String getKey() {
         return this.key;

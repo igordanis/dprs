@@ -120,8 +120,8 @@ public class WriteController {
         VectorClock mergedVectorClock = VectorClock.mergeToNewer(allVectorClocks);
 
         // Count successful updates
-        long countUpdates = allResponses.stream().filter(response -> response.isUpdated()).count();
-        boolean successful = countUpdates >= writeQuorum || countUpdates >= chordService.getChordCount();
+        long countSuccessfulResponses = allResponses.stream().filter(response -> response.isSuccessful()).count();
+        boolean successful = countSuccessfulResponses >= writeQuorum || countSuccessfulResponses >= chordService.getChordCount();
 
         return new DynamoWriteResponse(successful, mergedVectorClock.toJSON());
     }
