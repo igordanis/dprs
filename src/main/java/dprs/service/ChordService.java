@@ -62,18 +62,23 @@ public class ChordService {
             logger.info("Found changes in chord: ");
 
             final HashMap<Integer, NodeAddress> oldChordAddresses = new HashMap<>(chordAddresses);
+            HashMap<Integer, NodeAddress> newChordAddresses = new HashMap<>(chordAddresses);
 
+            // Added addresses first need to be replicated before we use them
             addedAddresses(catalogServiceList).stream().forEach(address -> {
                 logger.info("   Found new machine in chord: " + address.getFullAddress());
-                chordAddresses.put(address.getHash(), address);
+                newChordAddresses.put(address.getHash(), address);
             });
 
+            // Removed addresses are removed from chord right away
             removedAdresses(catalogServiceList).stream().forEach(address -> {
                 logger.info("   Found removed machine in chord: " + address.getFullAddress());
                 chordAddresses.remove(address.getHash());
+                newChordAddresses.remove(address.getHash());
             });
 
-            dataManagerService.handleChangesInChord(oldChordAddresses, chordAddresses);
+            dataManagerService.handleChangesInChord(oldChordAddresses, newChordAddresses);
+            chordAddresses = newChordAddresses;
 
             logger.info("Current machines in chord: " + chordAddresses.values().stream()
                     .map(a -> a.getHash() + " - " + a.getIP() + ":" + a.getPort())
