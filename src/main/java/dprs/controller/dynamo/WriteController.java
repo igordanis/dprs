@@ -48,7 +48,7 @@ public class WriteController {
     DataManagerService dataManagerService;
 
     @Value("${quorum.write}")
-    int writeQuorum;
+    int defaultWriteQuorum;
 
     @Value("${quorum.replication}")
     int replicationQuorum;
@@ -58,12 +58,25 @@ public class WriteController {
             @RequestParam(value = "key") String key,
             @RequestParam(value = "value") String value,
             @RequestParam(value = "vectorClock", required = false) String receivedVectorClock,
-            @RequestParam(value = "transactionId", required = false) String transactionId
+            @RequestParam(value = "transactionId", required = false) String transactionId,
+            @RequestParam(value = "writeQuorum", required = false) String receivedWriteQuorum
     ) {
         final String receivedTransactionId = transactionId != null ? transactionId : randomUUID().toString();
 
+
+        Integer usedWriteQuorum;
+        if(receivedWriteQuorum != null && Integer.valueOf(receivedWriteQuorum) <= chordService.getChordCount()){
+            usedWriteQuorum = Integer.valueOf(receivedWriteQuorum);
+        }else{
+            if(defaultWriteQuorum <= chordService.getChordCount())
+                usedWriteQuorum = defaultWriteQuorum;
+            else
+                usedWriteQuorum = chordService.getChordCount();
+        }
+
         // Find part of chord which manages given key
-        List<NodeAddress> destinationAddresses = chordService.findDestinationAddressesForKeyInChord(key, replicationQuorum);
+        List<NodeAddress> destinationAddresses = chordService
+                .findDestinationAddressesForKeyInChord(key, replicationQuorum);
 
         // If not coordinator for key, forward to it
         if (!destinationAddresses.get(0).equals(chordService.getSelfAddressInChord())) {
@@ -123,7 +136,7 @@ public class WriteController {
 
         // Count successful updates
         long countSuccessfulResponses = allResponses.stream().filter(response -> response.isSuccessful()).count();
-        boolean successful = countSuccessfulResponses >= writeQuorum || countSuccessfulResponses >= chordService.getChordCount();
+        boolean successful = countSuccessfulResponses >= usedWriteQuorum;
 
         return new DynamoWriteResponse(successful, mergedVectorClock.toJSON());
     }

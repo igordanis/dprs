@@ -12,6 +12,7 @@ import dprs.service.ChordService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -34,6 +35,8 @@ public class ReadController {
     public static final String READ = "/read";
     public static final String DYNAMO_READ = "/dynamoSingleWrite";
 
+    @Value("${quorum.write}")
+    int defaultWriteQuorum;
 
     @Autowired
     ChordService chordService;
@@ -41,14 +44,26 @@ public class ReadController {
     @RequestMapping(ReadController.READ)
     public ReadResponse read(
             @RequestParam(value = "key") String key,
-            @RequestParam(value = "readQuorum", required = true) Integer readQuorum
+            @RequestParam(value = "readQuorum", required = true) Integer receivedReadQuorum
     ) {
         String transactionId = randomUUID().toString();
+
+        Integer usedReadQuorum;
+        if(receivedReadQuorum != null && Integer.valueOf(receivedReadQuorum) <= chordService
+                .getChordCount()){
+            usedReadQuorum = Integer.valueOf(receivedReadQuorum);
+        }else{
+            if(defaultWriteQuorum <= chordService.getChordCount())
+                usedReadQuorum = defaultWriteQuorum;
+            else
+                usedReadQuorum = chordService.getChordCount();
+        }
 
         /*
          * Find part of chord which manages given key
          */
-        List<NodeAddress> destinationAddresses = chordService.findDestinationAddressesForKeyInChord(key, readQuorum);
+        List<NodeAddress> destinationAddresses = chordService
+                .findDestinationAddressesForKeyInChord(key, usedReadQuorum);
 
         /*
          * Ziska read odpovede od vsetkych dynamo uzlov ktore maju obsahovat dany objekt
@@ -94,7 +109,7 @@ public class ReadController {
                 .collect(Collectors.toSet());
 
         long countSuccessfulResponses = allResponses.stream().filter(response -> response.isSuccessful()).count();
-        boolean successful = countSuccessfulResponses >= readQuorum || countSuccessfulResponses >= chordService.getChordCount();
+        boolean successful = countSuccessfulResponses >= usedReadQuorum;
 
         return new ReadResponse(nextVectorClockToken, uniqValues, successful);
 

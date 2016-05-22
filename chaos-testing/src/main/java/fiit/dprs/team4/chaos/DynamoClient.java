@@ -62,13 +62,14 @@ public class DynamoClient implements Loggable{
         Assert.isTrue(readResponse.getUniqValues().contains(randomEntry.getValue().getValue()));
         //Existing read must return same vectorClock that it was previously returned by write,
         //or in case of replication returned vector clock must be newer
-        Assert.isTrue(
-                fromJSON(readResponse.getNextVectorClockToken())
-                        .equals(randomEntry.getValue().getVectorClock())
-                        || fromJSON(readResponse.getNextVectorClockToken())
-                        .isThisNewerThan(randomEntry.getValue().getVectorClock())
-        );
 
+        VectorClock responseVCtoken = fromJSON(readResponse.getNextVectorClockToken());
+        VectorClock entryVC = randomEntry.getValue().getVectorClock();
+
+        if(responseVCtoken.equals(entryVC) || responseVCtoken.isThisNewerThan(entryVC)){
+        }else{
+            Assert.isTrue(false);
+        }
     }
 
 
@@ -168,21 +169,16 @@ public class DynamoClient implements Loggable{
         final String newValue = UUID.randomUUID().toString().replaceAll("-", "");
 
         /*
-         * Overwrites existing value
+         * Overwrites existing value only on one node
          */
         VectorClock conflictingVectorClock = randomExistingEntry.getValue().getVectorClock().clone();
-        Integer randomKey = conflictingVectorClock.getVectorClock().keySet().stream()
-                .collect(Collectors.toList())
-                .get(ThreadLocalRandom.current().nextInt(conflictingVectorClock.getVectorClock()
-                        .keySet().size()));
-        conflictingVectorClock.decrementValueForComponent(randomKey);
-        conflictingVectorClock.decrementValueForComponent(randomKey);
 
         URI destinationUri = UriComponentsBuilder
                 .fromUriString("http://" + dynamoEndpoint + "/write")  // adresa loadbalancera
                 .queryParam("key", randomExistingEntry.getKey())
                 .queryParam("value", newValue)
                 .queryParam("vectorClock", conflictingVectorClock.toJSON())
+                .queryParam("writeQuorum", 1)
                 .build()
                 .toUri();
 
@@ -191,7 +187,6 @@ public class DynamoClient implements Loggable{
 
         //bol updatnute aspon 1 node
         Assert.isTrue(writeResponse.isSuccessful() == true);
-
 
 
         /*
@@ -273,16 +268,14 @@ public class DynamoClient implements Loggable{
             }
         }
 
-        Integer randomAction = ThreadLocalRandom.current().nextInt(7);
+        Integer randomAction = ThreadLocalRandom.current().nextInt(8);
         switch (randomAction){
             case 0:
                 writeNewValue(); break;
-
             case 1:
             case 2:
             case 3:
                 readRandomExisting(); break;
-
 
             case 4:
             case 5:
@@ -291,7 +284,7 @@ public class DynamoClient implements Loggable{
 
             case 7:
             case 8:
-            case 9: updateExistingConflict(); break;
+//            case 9: updateExistingConflict(); break;
         }
     }
 
