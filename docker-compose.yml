@@ -41,7 +41,7 @@ services:
           - "8080"
         depends_on:
           - consulserver
-#          - logstash
+          - logstash
 
     dynamo2:
         build:   ./docker/dynamo
@@ -51,7 +51,7 @@ services:
           - "8080"
         depends_on:
           - consulserver
-#          - logstash
+          - logstash
 
 
     # Run only once
@@ -80,32 +80,32 @@ services:
         depends_on:
           - consulserver
 
-#    elasticsearch:
-#      image: elasticsearch:latest
-#      command: elasticsearch -Des.network.host=0.0.0.0
-#      ports:
-#        - "9200:9200"
-#        - "9300:9300"
-#
-#
-#    logstash:
-#      image: logstash:latest
-#      command: logstash -f /etc/logstash/conf.d/logstash.conf
-#      volumes:
-#        - ./docker/logstash/config:/etc/logstash/conf.d
-#      ports:
-#        - "5000:5000"
-#      environment:
-#        - LS_HEAP_SIZE=64m
-#      depends_on:
-#       - elasticsearch
-#
-#    kibana:
-#      build: ./docker/kibana/
-#      volumes:
-#        - ./docker/kibana/config/:/opt/kibana/config/
-#      ports:
-#        - "5601:5601"
-#      depends_on:
-#       - elasticsearch
+    elasticsearch:
+      image: elasticsearch:latest
+      command: elasticsearch -Des.network.host=0.0.0.0
+      ports:
+        - "9200:9200"
+        - "9300:9300"
+
+
+    logstash:
+      image: logstash:latest
+      command: logstash -f /etc/logstash/conf.d/logstash.conf
+      volumes:
+        - ./docker/logstash/config:/etc/logstash/conf.d
+      ports:
+        - "5000:5000"
+      environment:
+        - LS_HEAP_SIZE=64m
+      depends_on:
+       - elasticsearch
+
+    kibana:
+      build: ./docker/kibana/
+      volumes:
+        - ./docker/kibana/config/:/opt/kibana/config/
+      ports:
+        - "5601:5601"
+      depends_on:
+       - elasticsearch
 
