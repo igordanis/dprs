@@ -141,7 +141,11 @@ public class DataManagerService {
                 .toUri();
 
         logger.info(transactionId + ": Sending bulk write to " + destinationUri);
-        new RestTemplate().getForObject(destinationUri, DynamoBulkWriteResponse.class);
+        try {
+            new RestTemplate().getForObject(destinationUri, DynamoBulkWriteResponse.class);
+        } catch (Exception e) {
+            logger.error(transactionId + ": Failed to send bulk write to " + destinationUri);
+        }
     }
 
     /**
