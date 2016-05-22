@@ -8,11 +8,11 @@ import org.springframework.web.client.RestTemplate;
  */
 public class TimeoutedRest {
 
-    public static RestTemplate getTimeoutedRestTemplate(){
+    public static RestTemplate getTimeoutedRestTemplate() {
         RestTemplate restTemplate = new RestTemplate();
-        ((SimpleClientHttpRequestFactory)restTemplate.getRequestFactory()).setReadTimeout(1000*5);
+        ((SimpleClientHttpRequestFactory) restTemplate.getRequestFactory()).setReadTimeout(1000 * 5);
+        ((SimpleClientHttpRequestFactory) restTemplate.getRequestFactory()).setConnectTimeout(1000 * 5);
         return restTemplate;
     }
-
 
 }

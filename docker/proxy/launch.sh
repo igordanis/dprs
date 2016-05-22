@@ -1,5 +1,5 @@
 #!/bin/bash
 
 /usr/local/bin/consul-template -config /etc/consul-template/config.d \
-                               -wait 2s:20s \
+                               -wait 0s:0s \
                                -consul consulserver:8500

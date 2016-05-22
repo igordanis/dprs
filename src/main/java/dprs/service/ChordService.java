@@ -12,7 +12,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.w3c.dom.Node;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -42,8 +41,22 @@ public class ChordService {
 
     @Scheduled(fixedDelay = 5000)
     public void updateNodeAddresses() {
-        List<CatalogService> catalogServiceList = consulClient.getCatalogService(applicationName,
+        // Find all registered CatalogServices
+        List<CatalogService> allServices = consulClient.getCatalogService(applicationName,
                 QueryParams.DEFAULT).getValue();
+
+        // Filter only healthy services
+        List<String> healthyNodes = consulClient.getHealthServices(applicationName, true, QueryParams.DEFAULT)
+                .getValue()
+                .stream()
+                .map(healthService -> healthService.getNode().getNode())
+                .collect(Collectors.toList());
+
+        // Filter out all CatalogServices so only the healthy ones remain
+        List<CatalogService> catalogServiceList = allServices
+                .stream()
+                .filter(catalogService -> healthyNodes.contains(catalogService.getNode()))
+                .collect(Collectors.toList());
 
         if (chordChanged(catalogServiceList)) {
             logger.info("Found changes in chord: ");
